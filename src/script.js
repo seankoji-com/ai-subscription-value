@@ -69,11 +69,11 @@ if (qScale === "log" || qScale === "linear") scale[1] = scale[2] = qScale;
 
 // Badge: maker logo in a round badge. Measured: filled. Inferred: hollow ring. Modelled: dashed ring.
 const R = 11;
-function badge(p) {
+function badge(p, withLogo = true) {
   const m = MAKERS[p.maker], s = 14, col = pcol(p), filled = ELIGIBLE(p.grade), dash = p.grade === "modelled" ? ` stroke-dasharray="3 2.5"` : "";
   return `<circle r="${R}" fill="${filled ? col : "var(--surface)"}" stroke="${filled ? "var(--surface)" : col}" stroke-width="2"${dash}/>
     ${p.grade === "own" ? `<circle r="${R + 3.5}" fill="none" stroke="${col}" stroke-width="1.5"/>` : ""}
-    <use href="#${m.logo}" x="${-s / 2}" y="${-s / 2}" width="${s}" height="${s}" fill="${filled ? pon(p) : col}"/>
+    ${withLogo ? `<use href="#${m.logo}" x="${-s / 2}" y="${-s / 2}" width="${s}" height="${s}" fill="${filled ? pon(p) : col}"/>` : ""}
     ${p.via_go ? `<g transform="translate(${R - 2} ${R - 2})"><circle r="5.5" fill="var(--surface)" stroke="var(--p-opencode)" stroke-width="1"/><use href="#logo-opencode" x="-3.5" y="-3.5" width="7" height="7" fill="var(--p-opencode)"/></g>` : ""}`;
 }
 function makerBadge(maker) {
@@ -293,7 +293,7 @@ function drawChart() {
     const cls = focus ? (isFocus(p) ? (on ? " focus" : " focus off-f") : " faint") : (!on ? " off" : (onF.has(p) || p === best ? "" : " dim"));
     const name = `${p.label}, ${p.plan}, ${usd(p.per_task)} per task, score ${p.idx}, ${p.mins} minutes${ELIGIBLE(p.grade) ? "" : ", " + GRADE_TEXT[p.grade]}`;
     g += `<g class="pt${cls}" data-i="${P.indexOf(p)}" data-label="${esc(p.label)}" transform="translate(${x} ${y})" tabindex="${on ? 0 : -1}" role="button" aria-label="${esc(name)}">
-      <circle r="14" fill="transparent"/><g transform="scale(${p === best ? 1.25 : 1})">${badge(p)}</g></g>`;
+      <circle r="14" fill="transparent"/><g transform="scale(${p === best ? 1.25 : 1})">${badge(p, ELIGIBLE(p.grade) || (focus && isFocus(p)) || p === best)}</g></g>`;
   }
   // Labels: the pick first, then frontier points, skipping any that would overlap.
   const placed = P.filter(p => focus ? isFocus(p) : passes(p)).map(p => [fx(p) - 13, fy(p) - 13, 26, 26]);  // visible badges are obstacles
