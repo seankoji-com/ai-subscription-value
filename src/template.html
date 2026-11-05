@@ -104,6 +104,18 @@ tr.win td { background: var(--wash); }
 ul { padding-left: 20px; } li { margin: 4px 0; }
 .note { color: var(--ink2); font-size: 13px; }
 a { color: var(--hard); }
+
+.method h3 { font-size: 15px; margin: 22px 0 6px; }
+.method h3:first-of-type { margin-top: 14px; }
+.method p { margin: 6px 0; }
+.method .eg { color: var(--ink2); font-size: 13.5px; border-left: 3px solid var(--axis); padding-left: 10px; }
+.method .formula { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; background: var(--wash); border-radius: 8px; padding: 10px 12px; }
+.mtable { table-layout: fixed; }
+.mtable td:first-child { width: 28%; }
+.mtable td:last-child { width: 78px; }
+@media (max-width: 560px) { .mtable thead { display: none; } .mtable tr, .mtable td { display: block; width: auto !important; } .mtable td:first-child { font-weight: 600; padding-top: 10px; } .mtable td { border-bottom: 0; padding: 2px 0; } .mtable tr { border-bottom: 1px solid var(--grid); padding-bottom: 8px; } }
+#working table td:first-child { white-space: nowrap; color: var(--ink2); width: 1%; }
+#working .wtitle { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 16px; margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -139,6 +151,10 @@ a { color: var(--hard); }
   <div class="card rec" id="rec" aria-live="polite"></div>
 </div>
 
+<h2 id="workhead">Show the working</h2>
+<p class="note">Tap any point on the chart to see exactly how its numbers were worked out. Until you do, this shows the cheapest measured option.</p>
+<div class="card" id="working" aria-live="polite"></div>
+
 <h2 id="tblhead">All points</h2>
 <div class="card tablewrap"><table id="tbl"></table></div>
 
@@ -149,21 +165,65 @@ a { color: var(--hard); }
 <div class="card">
 <ul>
 <li><b>Muse capacity is assumed.</b> Meta publishes Muse Code limits only as prompts per 5 hours (Maximum = 80× Everyday), so Muse Code Maximum ($200) is assumed to return the same API-equivalent value per dollar as Claude Ultra's measured $1,549/wk. Muse Spark 1.3 and Muse Wonder use AA's measured API cost. Muse Wonder Full has no API price (AA lists $0.00), so its tokens are priced at Fable 5.1's cost per token and it is drawn as modelled.</li>
-<li><b>DeepSeek and Kimi come through OpenCode Go.</b> They have no top plan of their own here, so they use OpenCode Go ($10) with its published per-model allowances. Their logos show the model maker. Kimi K3.1 Pro isn't plotted: AA hasn't published a coding-agent row for it.</li>
+<li><b>DeepSeek and Kimi come through OpenCode Go.</b> They have no top plan of their own here, so they use OpenCode Go ($10) with its published per-model allowances. Their logos show the model maker. Kimi K3.1 Pro has no AA coding-agent row, so it is modelled from Kimi K3's row.</li>
 <li><b>Gemini has no measured capacity.</b> Google publishes no Antigravity quota. The plotted capacity is a September scenario for the Ultra 5× tier ($1,890–$5,671/month), scaled 4× for Ultra 20×. Gemini 4 Carbon scores 59 on Antigravity but isn't generally available and has no cost or time row yet.</li>
 <li><b>Grok rests on one receipt.</b> SuperGrok Heavy capacity comes from one account's meter movement. SuperGrok ($30) has no measurement, so there's no way to tell which Grok plan is better value.</li>
 <li><b>OpenCode harness mismatch.</b> AA tested OpenCode only with GLM-5.3, and GLM-5.3 isn't in Go's published list. Every Go point therefore uses another harness's benchmark row as a proxy.</li>
-<li><b>Effort levels.</b> The coding-agent index (v2.0) tests Claude models and GPT-6.1 Sol at max only. Sonnet 5.5 and Sol at low–xhigh come from AA's 5 Oct snapshot, rescaled to v2.0 through each model's max row, and are graded inferred. Opus 5.5 at low–xhigh is modelled from Anthropic's own effort curve: cost from its SWE-bench Pro subset ($0.11 low, $0.21 medium, $0.29 high, $0.74 xhigh per task), score from the average of its SWE-bench Pro and Terminal-Bench 4.0 results relative to xhigh, and time from AA's Opus tokens per task at each effort. Anthropic publishes no max row, so the xhigh→max step uses AA's own Opus effort data (cost ×1.66, score ×1.047). These points are drawn with a dashed ring and never recommended. Where AA's Intelligence Index ran a model at every effort (Fable, Haiku, Astra, Luna, Grok), its effort curve is applied to the coding row; those points are modelled too.</li>
+<li><b>Effort levels.</b> See "How the numbers are calculated" for every method. The coding-agent index (v2.0) tests Claude models and GPT-6.1 Sol at max only. Sonnet 5.5 and Sol at low–xhigh come from AA's 5 Oct snapshot, rescaled to v2.0 through each model's max row, and are graded inferred. Opus 5.5 at low–xhigh is modelled from Anthropic's own effort curve: cost from its SWE-bench Pro subset ($0.11 low, $0.21 medium, $0.29 high, $0.74 xhigh per task), score from the average of its SWE-bench Pro and Terminal-Bench 4.0 results relative to xhigh, and time from AA's Opus tokens per task at each effort. Anthropic publishes no max row, so the xhigh→max step uses AA's own Opus effort data (cost ×1.66, score ×1.047). These points are drawn with a dashed ring and never recommended. Where AA's Intelligence Index ran a model at every effort (Fable, Haiku, Astra, Luna, Grok), its effort curve is applied to the coding row; those points are modelled too.</li>
 </ul>
 </div>
 
-<h2>Method</h2>
-<div class="card">
+<h2>How the numbers are calculated</h2>
+<div class="card method">
+<p>Every point is one model at one effort level, on one subscription plan. Five numbers produce its position: a score, an API cost per task and a time per task from the benchmark, a plan capacity, and a plan price.</p>
+
+<h3>1. Score</h3>
+<p>The score is the <a href="https://artificialanalysis.ai/agents/coding-agents">Artificial Analysis Coding Agent Index v2.0</a>: the plain average of three pass rates, each run in the model's own agent harness.</p>
 <ul>
-<li><b>Tasks per month</b> = monthly API-equivalent capacity ÷ AA API cost per task. Weekly measurements are scaled by 52/12.</li>
-<li><b>Subscription $/task</b> = plan price ÷ tasks per month. An earlier version divided this by the score to get "$ per success". That treated the score as a retry rate, as if every failed task would eventually pass, and it made cheap weak models (Luna low) look best. The main chart now plots cost against time and uses the score only as a minimum you set.</li>
-<li><b>Evidence grades.</b> Measured: a third-party capacity measurement that includes this model's traffic, plus an AA v2.0 row in the plan's own harness. Inferred: plan-level capacity applied to a model outside the measured mix, a scaled scenario, a proxy harness, or an effort row rescaled from the older snapshot. Modelled: no published benchmark at all, estimated from a sibling model. Only measured points are recommended.</li>
-<li><b>Caveat.</b> Every capacity figure is an estimate from a third party or a scenario. None comes from a vendor contract. The method assumes a plan meters each model at its API price, which providers don't promise: wokey reports that Opus 5.5 uses about 0.6× the limit per token of other Opus models. Five-hour windows are ignored; the report assumes 100% of the weekly cap is used.</li>
+<li><b>FrontierCode v1.1:</b> writing code changes to real repositories (partial credit allowed).</li>
+<li><b>Terminal-Bench 4.0:</b> multi-step tasks in a terminal. This is the closest of the three to hands-on agent work.</li>
+<li><b>SWE-Atlas QnA:</b> answering questions about a codebase by reading it.</li>
+</ul>
+<p class="eg">Example: DeepSeek V4.1 Flash scores (46.55 + 30.81 + 61.56) ÷ 3 ≈ 46.3. GPT-6.1 Terra medium scores (43.75 + 35.35 + 47.04) ÷ 3 ≈ 42.0. DeepSeek's lead comes almost entirely from SWE-Atlas QnA; Terra medium is ahead on Terminal-Bench. Each benchmark has a few dozen to about 100 tasks, so differences of a few points are within run-to-run noise.</p>
+
+<h3>2. API cost and time per task</h3>
+<p>AA measures what one attempt at one task costs at pay-per-token API prices (input, cached input, cache writes and output, at list price) and how long the agent runs. Both are averages over every attempt, failures included.</p>
+
+<h3>3. Plan capacity</h3>
+<p>Capacity is the <b>API-equivalent dollars of use a plan allows per month at 100% of its weekly cap</b>. OpenCode Go is the exception that publishes this directly, as a monthly dollar allowance per model (for example $100 for DeepSeek V4.1 Flash), and those allowances are used as-is. The other providers publish no limits in tokens or dollars. Third parties measure it by watching a plan's usage meter rise while pricing the same traffic at API rates: if $50 of API-priced work moves the weekly meter by 5%, the week is worth $1,000. Weekly figures are multiplied by 52 ÷ 12 to get a month. The plans table below lists the source for every plan, and models without their own measurement use the plan-wide figure.</p>
+
+<h3>4. Tasks per month and cost per task</h3>
+<p class="formula">tasks per month = plan capacity ÷ API cost per task<br>subscription cost per task = plan price ÷ tasks per month</p>
+<p class="eg">Example: Opus 5.5 max on Claude Ultra. Capacity $1,549/week × 52 ÷ 12 = $6,712/month. AA's API cost is $11.42 per task, so $6,712 ÷ $11.42 ≈ 588 tasks a month, and $200 ÷ 588 ≈ <b>$0.340 per task</b>.</p>
+<p>Because both formulas divide by the same API cost, cost per task is really <i>plan price × API cost ÷ capacity</i>. A model that is cheap at API prices is cheap on any plan that meters it at those prices. Providers don't promise to meter that way.</p>
+
+<h3>5. Effort levels AA doesn't publish</h3>
+<p>AA's current coding index tests most models at one effort level. The others are derived, and the working panel shows the exact numbers for each point:</p>
+<table class="mtable">
+<thead><tr><th>Models</th><th>Method</th><th>Grade</th></tr></thead>
+<tbody>
+<tr><td>Sonnet 5.5, GPT-6.1 Sol (low–xhigh)</td><td>AA's 5 Oct snapshot tested these efforts. Each value is multiplied by (current max ÷ 5 Oct max), so the curve keeps its shape but sits on the current index.</td><td>inferred</td></tr>
+<tr><td>Opus 5.5 (low–xhigh)</td><td>Anthropic's published effort curve: cost from its SWE-bench Pro subset ($0.11, $0.21, $0.29, $0.74 per task), score from the average of its SWE-bench Pro and Terminal-Bench results, each relative to xhigh. Anthropic publishes no max result, so AA's own Opus data bridges xhigh to max (cost × 1.66, score × 1.047). Time follows AA's Opus tokens per task.</td><td>modelled</td></tr>
+<tr><td>Fable 5.1, Haiku 5.5, GPT-6 Astra, GPT-6 Luna, Grok 4.7</td><td>AA's Intelligence Index ran these at every effort. The coding row is multiplied by that curve: cost by the cost ratio, time by the output-token ratio, score by the score ratio.</td><td>modelled</td></tr>
+<tr><td>DeepSeek V4.1 Flash (low–high)</td><td>Only no-reasoning ($0.425, score 45.0, 65k tokens) and max ($0.602, 59.1, 139k) are measured, plus a score at high (51.4). Cost and tokens step geometrically from no-reasoning to max; low and medium scores sit evenly between no-reasoning and high. AA's coding run used DeepSeek's default setting, treated here as max.</td><td>modelled</td></tr>
+<tr><td>Gemini 3.8 Flash (low, medium)</td><td>BenchLeader publishes scores at low (56.1) and medium (60.6) but cost and time only at high. Scores use those measured ratios to high; cost and time use the reference effort curve: the median ratio across the eight models AA ran at every effort (Opus, Sonnet, Fable, Haiku, Sol, Terra, Astra, Luna).</td><td>modelled</td></tr>
+<tr><td>Muse Wonder Full (low–xhigh)</td><td>Only max is benchmarked anywhere, so score, cost and time all follow the reference effort curve relative to max. Its max cost is itself priced from Fable 5.1, since Muse Wonder Full has no API price.</td><td>modelled</td></tr>
+<tr><td>Kimi K3.1 Pro</td><td>AA has no coding-agent row for it. Kimi K3's coding row is scaled by the two models' Intelligence Index results: cost × ($3.68 ÷ $2.37), score × (61.6 ÷ 53.7), time × (35 ÷ 13 minutes).</td><td>modelled</td></tr>
+</tbody>
+</table>
+
+<h3>6. Evidence grades</h3>
+<ul>
+<li><b>Measured</b> (filled badge): a capacity measurement that includes this model's traffic, and an AA row in the plan's own harness. Only these are recommended.</li>
+<li><b>Inferred</b> (hollow badge): capacity measured for other models on the plan, a scaled scenario, a benchmark run in a different harness, or an effort level rescaled from the older snapshot.</li>
+<li><b>Modelled</b> (dashed badge): no published benchmark at that effort level, or no API price.</li>
+</ul>
+
+<h3>Caveats</h3>
+<ul>
+<li>Every capacity figure is an estimate from a third party or a scenario, not a vendor contract. Wokey reports that Opus 5.5 uses about 0.6× the limit per token of other Opus models, so metering isn't always at API price.</li>
+<li>Five-hour windows are ignored; the report assumes 100% of the weekly cap is used.</li>
+<li>A task here is one benchmark task, not a unit of your own work. An earlier version divided cost by the score to get "cost per success". That treated the score as a retry rate and made cheap weak models look best, so the score is now kept on its own axis and as a minimum you set.</li>
 </ul>
 <p class="note">Sources: <a href="https://artificialanalysis.ai/agents/coding-agents">AA Coding Agent Index</a> (data via <a href="https://github.com/hraness/aicharts/blob/main/data/coding-agents.json">hraness/aicharts</a>, retrieved 27 Oct 2026) ·
 <a href="https://wokey.ai/claude-usage-limits">wokey Claude limits</a> · <a href="https://wokey.ai/codex-usage-limits">wokey Codex limits</a> ·

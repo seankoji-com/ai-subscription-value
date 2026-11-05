@@ -31,6 +31,11 @@ cost per task   = plan price ÷ tasks per month
   - Sonnet 5.5 and GPT-6.1 Sol: rescaled from AA's 5 Oct snapshot through each model's max row.
   - Opus 5.5: modelled from Anthropic's published effort curve.
   - Fable, Haiku, Astra, Luna and Grok: modelled from AA's Intelligence Index effort curves.
+  - DeepSeek V4.1 Flash low, medium and high: modelled between its measured no-reasoning and max results.
+  - Gemini 3.8 Flash low and medium, and Muse Wonder Full below max: modelled from the median effort curve of the models AA ran at every effort.
+  - Kimi K3.1 Pro: no coding-agent row exists, so it is scaled from Kimi K3's row using both models' Intelligence Index results.
+
+The page's "How the numbers are calculated" section explains each step. Tapping any point shows its full working: score components, API cost, capacity source, tasks per month and cost per task.
 - **Capacity:** vendors don't publish plan quotas in tokens or dollars. Each figure comes from a third-party measurement, a published allowance or a stated assumption, and the page lists the source for every one. Points are graded:
   - **Measured:** a capacity measurement that includes this model's traffic.
   - **Inferred:** capacity measured for other models on the plan, a scaled scenario, or a benchmark run in a different harness.
