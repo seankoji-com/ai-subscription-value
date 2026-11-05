@@ -43,6 +43,7 @@ const BENCHES = ["coding"];
 let bench = BENCHES.includes(params.get("bench")) ? params.get("bench") : (BENCHES.includes(store.get("subvalue-bench-v3")) ? store.get("subvalue-bench-v3") : "coding");
 // Filter: a maker name, "go" for everything served through OpenCode Go, or "" for all.
 let filter = params.has("provider") ? params.get("provider") : (store.get("subvalue-filter") || "");
+let measuredOnly = store.get("subvalue-measured") === "1";
 let B, P, ALL;
 // Focus: tapping a point shows only that model (same plan and family) at every effort level.
 let focus = params.get("focus") || "";
@@ -54,9 +55,11 @@ function selectData() {
   B = DATA.benchmarks[bench]; ALL = B.modes[capMode];
   if (filter && !ALL.some(inFilter)) filter = "";
   if (focus && !ALL.some(p => famKey(p) === focus && inFilter(p))) focus = "";
-  P = ALL.filter(inFilter);
+  P = measuredOnly ? ALL.filter(inFilter).filter(p => ELIGIBLE(p.grade)) : ALL.filter(inFilter);
   document.getElementById("benchabout").innerHTML = `<b>${esc(B.long)}.</b> ${esc(B.about)} Score: ${esc(B.score)}. <a href="${esc(B.url)}">Source</a>.`;
   document.querySelectorAll("#benchseg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.bench === bench)));
+  const mt = document.getElementById("measuredToggle");
+  if (mt) mt.setAttribute("aria-pressed", String(measuredOnly));
   drawFilters();
 }
 const scale = { 1: store.get("subvalue-scale1") === "linear" ? "linear" : "log", 2: store.get("subvalue-scale2") === "linear" ? "linear" : "log" };
@@ -123,7 +126,7 @@ function axis(kind, values, a, b) {
 const fmtTick = (v, money) => money ? "$" + (v >= 1 || v === 0 ? v : +v.toPrecision(2)) : String(v);
 
 function frame(kind, xAx, yAx, m, W, H, xTitle, yTitle, xMoney = false, yMoney = true) {
-  const thin = (ticks, f, minGap) => { let last = -Infinity; return ticks.filter(v => { const p = f(v); if (p - last >= minGap) { last = p; return true; } return false; }); };
+  const thin = (ticks, f, minGap) => { let last = null; return ticks.filter(v => { const p = f(v); if (last === null || Math.abs(p - last) >= minGap) { last = p; return true; } return false; }); };
   const xTicks = W < 560 ? thin(xAx.ticks, xAx.f, 58) : xAx.ticks;
   const yTicks = H < 430 ? thin(yAx.ticks, yAx.f, 26) : yAx.ticks;
   let g = "";
@@ -143,7 +146,7 @@ function familyLines(pts, fx, fy, hl = "") {
   for (const arr of Object.values(fam)) {
     if (arr.length < 2) continue;
     arr.sort((a, b) => EFFORT_ORDER.indexOf(a.effort) - EFFORT_ORDER.indexOf(b.effort));
-    g += `<polyline points="${arr.map(p => `${fx(p)},${fy(p)}`).join(" ")}" fill="none" stroke="${pcol(arr[0])}" stroke-width="${hl && famKey(arr[0]) === hl ? 2.5 : 1.5}" stroke-linejoin="round" opacity="${!hl ? 0.35 : famKey(arr[0]) === hl ? 0.9 : 0.08}"/>`;
+    g += `<polyline points="${arr.map(p => `${fx(p)},${fy(p)}`).join(" ")}" fill="none" stroke="${pcol(arr[0])}" stroke-width="${hl && famKey(arr[0]) === hl ? 2.5 : 1.25}" stroke-linejoin="round" opacity="${!hl ? 0.26 : famKey(arr[0]) === hl ? 0.9 : 0.08}"/>`;
   }
   return g;
 }
@@ -175,12 +178,12 @@ const tipHtml = p => `<b>${esc(p.label)}</b> ${gradePill(p.grade)}
   <div>${p.tasks.toLocaleString()} tasks/mo at full cap · API ${usd(p.api)}/task</div>
   <div style="margin-top:4px">${esc(p.note)}</div>`;
 
-const gradeLegend = `<span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="6" fill="var(--ink2)"/></svg>Measured</span>
-  <span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5.5" fill="none" stroke="var(--ink2)" stroke-width="1.5"/></svg>Inferred</span>
-  <span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5.5" fill="none" stroke="var(--ink2)" stroke-width="1.5" stroke-dasharray="3 2.5"/></svg>Modelled</span>
+const gradeLegend = `<span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="6" fill="var(--ink-2)"/></svg>Measured</span>
+  <span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5.5" fill="none" stroke="var(--ink-2)" stroke-width="1.5"/></svg>Inferred</span>
+  <span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5.5" fill="none" stroke="var(--ink-2)" stroke-width="1.5" stroke-dasharray="3 2.5"/></svg>Modelled</span>
   <span class="legend-extra">${goBadge.replace('width="20" height="20"', 'width="14" height="14"')}Served via OpenCode Go</span>
   <span class="legend-extra"><svg width="26" height="10"><line x1="1" x2="25" y1="5" y2="5" stroke="var(--p-claude)" stroke-width="1.5" opacity="0.45"/></svg>Effort levels of one model</span>`;
-const drawLegend = () => document.getElementById("legend").innerHTML = gradeLegend + `<span><svg width="26" height="14"><line x1="4" x2="22" y1="7" y2="7" stroke="var(--ink)" stroke-opacity="0.12" stroke-width="10" stroke-linecap="round"/></svg>${yMode === "score" ? "Quality frontier" : "Cost–speed frontier"}</span><span class="legend-extra"><svg width="34" height="14" viewBox="0 0 34 14"><circle cx="7" cy="7" r="6" fill="var(--ink2)"/><circle cx="25" cy="7" r="6" fill="var(--ink2)" opacity="0.3"/></svg>${yMode === "score" ? "On the frontier / something cheaper scores as well" : "On the frontier / beaten on cost and time"}</span><span><b style="color:var(--ink)">Bold label</b>&nbsp;cheapest measured</span>`;
+const drawLegend = () => document.getElementById("legend").innerHTML = gradeLegend + `<span><svg width="26" height="14"><line x1="4" x2="22" y1="7" y2="7" stroke="var(--ink)" stroke-opacity="0.12" stroke-width="10" stroke-linecap="round"/></svg>${yMode === "score" ? "Quality frontier" : "Cost–speed frontier"}</span><span class="legend-extra"><svg width="34" height="14" viewBox="0 0 34 14"><circle cx="7" cy="7" r="6" fill="var(--ink-2)"/><circle cx="25" cy="7" r="6" fill="var(--ink-2)" opacity="0.3"/></svg>${yMode === "score" ? "On the frontier / something cheaper scores as well" : "On the frontier / beaten on cost and time"}</span><span><b style="color:var(--ink)">Bold label</b>&nbsp;cheapest measured</span>`;
 
 function emptyChart(svg, W, H) {
   svg.setAttribute("width", W); svg.setAttribute("height", 120);
@@ -271,7 +274,7 @@ function drawChart() {
   let g = frame(yMode === "score" ? kind : kind, xAx, yAx, m, W, H, `Subscription $ per ${B.task}`,
                 yMode === "score" ? B.score : `Minutes per ${B.task}`, true, false);
   if (yMode === "score") g = g.replace(`${esc(B.score)} (${kind})`, esc(B.score));
-  g += familyLines(P.filter(p => passes(p) || isFocus(p)), fx, fy, focus);  // connect effort levels that pass the filters (and the highlighted model)
+  g += familyLines(P.filter(p => (passes(p) || isFocus(p)) && (ELIGIBLE(p.grade) || (focus && famKey(p) === focus))), fx, fy, focus);  // lines for measured families and the highlighted model
   // Frontier among points that pass the filters. Time: nothing else is both cheaper and faster.
   // Score: nothing cheaper scores higher.
   const fr = (yMode === "score" ? qualityFrontier : frontierOf)(P.filter(passes)), onF = new Set(fr);
@@ -294,7 +297,7 @@ function drawChart() {
   const fits = (x0, y0, w, h) => !placed.some(b => x0 < b[0] + b[2] && b[0] < x0 + w && y0 < b[1] + b[3] && b[1] < y0 + h);
   // While a model is highlighted, label only its effort levels.
   const want = focus ? P.filter(isFocus).sort((a, b) => EFFORT_ORDER.indexOf(b.effort) - EFFORT_ORDER.indexOf(a.effort))
-    : [best, ...[...fr].reverse()].filter((p, i, a) => p && a.indexOf(p) === i);
+    : [best, ...[...fr].reverse().filter(p => ELIGIBLE(p.grade))].filter((p, i, a) => p && a.indexOf(p) === i);
   for (const p of want) {
     const x = fx(p), y = fy(p), w = p.label.length * 6.3 + 6, h = 14;
     const spots = [[x - w / 2, y - R - 22, "middle", x, y - R - 11], [x + 18, y - 7, "start", x + 18, y + 4],
@@ -342,7 +345,7 @@ function drawVerdict() {
   document.getElementById("verdict").innerHTML = `
     <div class="vlabel">The pick for most people</div>
     <p class="vpick">${esc(best.label)}</p>
-    <p class="vplan">${esc(best.plan)} · ${gradePill(best.grade)}</p>
+    <p class="vplan">${esc(best.plan)} · $${best.price}/mo · ${gradePill(best.grade)}</p>
     <p class="vprice">${usd(best.per_task)}<small>per task</small></p>
     <div class="vstats">
       <div class="vstat"><b>${best.idx}</b><span>Index score</span></div>
@@ -350,6 +353,7 @@ function drawVerdict() {
       <div class="vstat"><b>${best.mins} min</b><span>per task</span></div>
     </div>
     <p class="vwhy">${esc(why)}</p>
+    <p class="vassume">Assumes 100% of the plan's weekly cap is used.</p>
     <a class="vcta" href="#explore">See how it compares ↓</a>`;
 }
 
@@ -432,6 +436,19 @@ document.querySelectorAll("[data-scale-for]").forEach(grp => {
   }));
   sync();
 });
+
+document.getElementById("measuredToggle").addEventListener("click", () => {
+  measuredOnly = !measuredOnly;
+  store.set("subvalue-measured", measuredOnly ? "1" : "0");
+  focus = ""; selectData(); renderAll();
+});
+function resetFilters() {
+  filter = ""; focus = ""; workLabel = ""; measuredOnly = false;
+  minScore = null; maxCost = null; maxMins = null;
+  store.set("subvalue-filter", ""); store.set("subvalue-measured", "0");
+  selectData(); renderAll();
+}
+document.getElementById("resetBtn").addEventListener("click", resetFilters);
 
 selectData();
 drawVerdict(); drawGlance(); drawValueBars();

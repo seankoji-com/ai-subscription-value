@@ -141,6 +141,7 @@ h1 {
 }
 .vstat b { display: block; font: 600 15px/1.25 var(--sans); }
 .vstat span { display: block; font: 600 9.5px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; opacity: .62; margin-top: 2px; }
+.vassume { font-size: 11.5px; line-height: 1.4; opacity: .66; margin: -4px 0 0; position: relative; z-index: 1; }
 .vwhy { font-size: 14px; line-height: 1.5; opacity: .9; max-width: 48ch; margin: 4px 0 0; position: relative; z-index: 1; }
 .vcta {
   align-self: flex-start; margin-top: 4px; padding: 9px 15px; border-radius: 999px;
@@ -219,6 +220,8 @@ h2 { font-family: var(--serif); font-weight: 500; font-size: clamp(27px, 3.1vw, 
 .chip:hover { color: var(--ink); border-color: var(--line-2); }
 .chip[aria-pressed="true"] { color: var(--on-accent); background: var(--accent); border-color: var(--accent); font-weight: 600; }
 .chip.all { padding-left: 11px; }
+.reset-btn { font-size: 11.5px; color: var(--ink-2); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer; margin-left: auto; }
+.reset-btn:hover { color: var(--ink); border-color: var(--line-2); }
 .chip img, .chip svg { flex: none; }
 
 /* Explorer grid */
@@ -236,8 +239,8 @@ svg text { fill: var(--muted); font-size: 11px; font-family: var(--sans); }
 svg .lbl { fill: var(--ink-2); font-size: 11.5px; }
 svg .lbl.win { fill: var(--ink); font-weight: 600; }
 svg .pt { transition: opacity 180ms ease; cursor: pointer; }
-svg .pt.off { opacity: .1; }
-svg .pt.dim { opacity: .26; }
+svg .pt.off { opacity: .14; }
+svg .pt.dim { opacity: .38; }
 svg .pt.faint { opacity: .1; }
 svg .pt.focus.off-f { opacity: .55; }
 svg .pt:hover, svg .pt:focus { opacity: 1; }
@@ -367,6 +370,9 @@ footer p { margin: 4px 0; max-width: 80ch; }
   .disclosure > summary { padding: 15px 16px; }
   .disclosure .body { padding: 2px 16px 18px; }
   .tablewrap { max-height: 64vh; }
+  #tbl th:first-child, #tbl td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 1px 0 0 var(--line); }
+  #tbl tr.win td:first-child { background: var(--accent-soft); }
+  #tbl tr.hl td:first-child { background: color-mix(in srgb, var(--ink) 6%, var(--surface)); }
   .mtable thead { display: none; }
   .mtable tr, .mtable td { display: block; width: auto !important; }
   .mtable td:first-child { font-weight: 600; padding-top: 10px; width: auto; }

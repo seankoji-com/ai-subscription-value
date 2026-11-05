@@ -70,11 +70,16 @@
             <button type="button" data-y="score">Score</button>
           </div>
         </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">Evidence</span>
+          <button type="button" class="chip" id="measuredToggle" aria-pressed="false">Measured only</button>
+        </div>
         <div class="filters" id="filters" role="group" aria-label="Filter by provider"></div>
         <div class="sliders">
           <label class="slider">Minimum score <input type="range" id="minScore" aria-describedby="minScoreOut"> <b id="minScoreOut">off</b></label>
           <label class="slider">Maximum $/task <input type="range" id="maxCost" aria-describedby="maxCostOut"> <b id="maxCostOut">off</b></label>
           <label class="slider">Maximum minutes <input type="range" id="maxMins" aria-describedby="maxMinsOut"> <b id="maxMinsOut">off</b></label>
+          <button type="button" class="reset-btn" id="resetBtn">Reset filters</button>
         </div>
       </div>
 
