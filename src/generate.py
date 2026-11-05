@@ -1,0 +1,210 @@
+"""Build the report data: subscription cost per agentic-coding task for each model and effort level.
+
+usage: python3 src/generate.py data/ site/data.json
+
+Inputs (data/):
+  aa-coding-agents-2026-10-27.json  Artificial Analysis Coding Agent Index v2.0, via hraness/aicharts (commit e8e50a2316)
+  aa-coding-agents-2026-10-05.json  the previous AA snapshot (commit 0529938df7), used for Sonnet 5.5 and GPT-6.1 Sol effort levels
+
+Method
+  tasks/month   = plan capacity (API-equivalent $/month) / AA API cost per task
+  $/task        = plan price / tasks per month
+Lower effort levels that AA's coding index doesn't publish are modelled:
+  Sonnet 5.5, GPT-6.1 Sol  rescaled from the 5 Oct snapshot through each model's max row
+  Opus 5.5                 Anthropic's published effort curve, anchored to AA's max row
+  Fable, Haiku, Astra, Luna, Grok   AA Intelligence Index effort curves (via BenchLeader, 4 Nov 2026)
+"""
+import json, os, statistics, sys
+
+DATA, OUT = sys.argv[1], sys.argv[2]
+V2 = json.load(open(os.path.join(DATA, "aa-coding-agents-2026-10-27.json")))["records"]
+OLD = json.load(open(os.path.join(DATA, "aa-coding-agents-2026-10-05.json")))["records"]
+WK = 52 / 12  # weeks per month
+
+
+def find(rows, agent, model, setting):
+    for r in rows:
+        if r["agent"] == agent and r["model"] == model and r["setting"] == setting:
+            return dict(api=r["economics"]["costUsd"], mins=r["economics"]["durationSeconds"] / 60, idx=r["benchmarks"]["aaIndex"])
+    raise KeyError((agent, model, setting))
+
+
+def v2(a, m, s):
+    return find(V2, a, m, s)
+
+
+# ---------------- plans and capacity ----------------
+# Top plan per provider; OpenCode Go for models without a plan of their own.
+# Capacity is API-equivalent USD per month from public sources. "models" holds model-specific measurements;
+# other models on a plan use "plan_cap" and are graded inferred.
+PLANS = {
+    "claude": dict(provider="Claude", plan="Claude Ultra (was Max 20x)", price=200, plan_cap=1549 * WK,
+                   models={"Opus 5.5": (1549 * WK, "Opus 5.5: wokey.ai plan median $1,549/wk (Claude Code traffic). A RemakeBench receipt that was 96% Opus implies more, ≈$2,155/wk"),
+                           "Sonnet 5.5": (1549 * WK, "Sonnet 5.5: wokey.ai plan median $1,549/wk; one creator's Sonnet report (≈$1,523/wk) agrees")},
+                   cap_src="Other Claude models: wokey.ai plan median $1,549/wk (18 accounts, 26 Oct–2 Nov 2026)",
+                   cap_url="https://wokey.ai/claude-usage-limits",
+                   alt="Top Claude plan (Max 20x, renamed Ultra on 30 Oct 2026). Pro $20 measures the same value per dollar."),
+    "chatgpt": dict(provider="ChatGPT", plan="ChatGPT Pro $500 (Codex)", price=500, plan_cap=581 * WK * 6955 / 2897,
+                    models={"GPT-6 Astra": (6955, "GPT-6 Astra: SemiAnalysis Astra-only measurement on Pro $500, $6,955/mo (5 Oct 2026)")},
+                    cap_src="Other ChatGPT models: no Sol-class measurement exists on Pro $500, so wokey's Pro $200 Sol median ($581/wk) is scaled by SemiAnalysis's Pro $500 ÷ Pro $200 ratio (2.40×) ≈ $1,395/wk; codex-reset's Pro $500 estimates ($1,010–$1,640/wk) bracket it",
+                    cap_url="https://wokey.ai/codex-usage-limits",
+                    alt="Top ChatGPT plan. Per dollar it measures about 4% below Pro $200 (Astra-only: 13.9× vs 14.5×)."),
+    "gemini": dict(provider="Gemini", plan="Google AI Ultra 20× ($199.99)", price=199.99, plan_cap=4 * 3780.38, models={},
+                   cap_src="Inferred: Google publishes no quota. Ultra 5× ($100) September scenario $3,780/mo (range $1,890–$5,671) × 4, since Ultra 20× is 4× the 5× tier",
+                   cap_url="https://aiandtractors.com/coding-agent-subscription-costs/",
+                   alt="Top Google AI plan (20× AI Pro's limits)."),
+    "grok": dict(provider="Grok", plan="SuperGrok Heavy ($300)", price=300, plan_cap=400.5 * WK,
+                 models={"Grok 4.7": (400.5 * WK, "Grok 4.7: single RemakeBench receipt, mostly Grok 4.7 xhigh, ≈$400.5/wk (n=1)")},
+                 cap_src="Single RemakeBench receipt: $76.10 API-equivalent moved the weekly meter 19 points, mostly Grok 4.7 xhigh → ≈$400.5/wk (n=1)",
+                 cap_url="https://aiandtractors.com/coding-agent-subscription-costs/",
+                 alt="Top Grok plan, and the only one with any capacity evidence."),
+    "muse": dict(provider="Muse", plan="Muse Code Maximum ($200)", price=200, plan_cap=1549 * WK, models={},
+                 cap_src="Assumed: Meta publishes Muse Code limits only as prompts per 5 hours (Maximum = 80× Everyday), so this assumes Maximum gives the same API-equivalent value per dollar as Claude Ultra's measured $1,549/wk",
+                 cap_url="https://ratelimitnow.com/limits/muse-code/",
+                 alt="Top Muse Code plan (80× Everyday). Power ($50, 20×) ties on multiplier per dollar."),
+    "opencode": dict(provider="OpenCode Go", plan="OpenCode Go ($10)", price=10, plan_cap=None, models={},
+                     cap_src="Official per-model monthly usage allowance on opencode.ai/go (limits are per model)",
+                     cap_url="https://opencode.ai/go",
+                     alt="Used for models with no plan of their own here (DeepSeek, Kimi). Go Plus $40 gives 2–4× the allowance per model: never better per dollar."),
+}
+GO_ALLOWANCE = {"DeepSeek V4.1 Flash": 100, "Kimi K3": 15}
+# Logo and colour follow the model maker; the plan stays with the subscription that serves it.
+MAKER = {"claude": "Claude", "chatgpt": "ChatGPT", "gemini": "Gemini", "grok": "Grok", "muse": "Muse"}
+FAMILY_MAKER = {"DeepSeek V4.1 Flash": "DeepSeek", "Kimi K3": "Kimi"}
+
+DIRECT, SCALED, MODELLED, PROXY = "direct", "scaled", "modelled", "proxy-harness"
+
+
+def row(plan, family, label, effort, api, mins, idx, basis=DIRECT, note="", go_allowance=None):
+    return dict(plan=plan, family=family, label=label, effort=effort, api=api, mins=mins, idx=idx, basis=basis, note=note, go_allowance=go_allowance)
+
+
+def scaled(agent, model, setting):
+    """Effort row from the 5 Oct snapshot, rescaled so its max row matches the current index's max row."""
+    old_e, old_max, new_max = find(OLD, agent, model, setting), find(OLD, agent, model, "max"), find(V2, agent, model, "max")
+    return {k: new_max[k] * old_e[k] / old_max[k] for k in ("api", "mins", "idx")}
+
+
+# Opus 5.5 below max: Anthropic's own effort curve (platform docs, "Optimizing for cost and intelligence"):
+#   SWE-bench Pro subset cost/task low .11 medium .21 high .29 xhigh .74; solved 87.4 / 92.8 / 95.3 / 96.7 %
+#   Terminal-Bench 4.0 medium 57.6 %, high 64.2 %, xhigh 66.4 %; low ~19 points below medium
+# Anthropic publishes no max row, so the xhigh→max step uses AA's Opus effort data (Intelligence Index, BenchLeader):
+#   cost xhigh $6.05 → max $10.04, tokens 103k → 173k, index 66.2 → 69.3.
+ANTH_COST = {"low": 0.11, "medium": 0.21, "high": 0.29, "xhigh": 0.74}
+ANTH_SWE = {"low": 87.4, "medium": 92.8, "high": 95.3, "xhigh": 96.7}
+ANTH_TB = {"low": 57.6 - 19, "medium": 57.6, "high": 64.2, "xhigh": 66.4}
+AA_OPUS_TOK = {"low": 19, "medium": 44, "high": 60, "xhigh": 103, "max": 173}
+X2M_COST, X2M_IDX = 10.04 / 6.05, 69.3 / 66.2
+
+
+def opus_curve(e):
+    mx = v2("Claude Code", "Opus 5.5", "max")
+    rel_score = (ANTH_SWE[e] / ANTH_SWE["xhigh"] + ANTH_TB[e] / ANTH_TB["xhigh"]) / 2
+    return dict(api=mx["api"] / X2M_COST * ANTH_COST[e] / ANTH_COST["xhigh"],
+                mins=mx["mins"] * AA_OPUS_TOK[e] / AA_OPUS_TOK["max"],
+                idx=mx["idx"] / X2M_IDX * rel_score)
+
+
+# AA Intelligence Index per effort (BenchLeader, 4 Nov 2026): (cost/task, index, output tokens k).
+# Used only for the shape of each model's effort curve.
+INTEL = {
+    "Fable 5.1": {"low": (4.47, 59.1, 38), "medium": (5.56, 62.2, 49), "high": (7.54, 63.9, 66), "xhigh": (10.85, 65.2, 97), "max": (12.99, 67.2, 118)},
+    "Haiku 5.5": {"low": (0.044, 47.9, 28), "medium": (0.092, 50.3, 53), "high": (0.159, 55.8, 88), "xhigh": (0.248, 57.1, 136), "max": (0.411, 57.0, 226)},
+    "GPT-6 Astra": {"low": (1.42, 62.6, 9), "medium": (2.73, 65.0, 18), "high": (3.24, 66.9, 23), "xhigh": (3.66, 66.7, 27), "max": (6.24, 67.8, 52)},
+    "GPT-6 Luna": {"low": (0.0051, 45.8, 3), "medium": (0.042, 49.8, 20), "high": (0.073, 51.3, 33), "xhigh": (0.104, 52.2, 44), "max": (0.152, 56.7, 75)},
+    "Grok 4.7": {"low": (2.92, 55.8, 43), "high": (6.18, 57.5, 89), "xhigh": (7.77, 58.2, 105)},
+}
+
+rows = []
+add = rows.append
+# Claude
+add(row("claude", "Opus 5.5", "Opus 5.5 max", "max", **v2("Claude Code", "Opus 5.5", "max"),
+        note="RemakeBench Max receipt (96% Opus 5.5) implies ≈$2,155/wk, above the plan median used here"))
+for e in ("xhigh", "high", "medium", "low"):
+    add(row("claude", "Opus 5.5", f"Opus 5.5 {e}", e, **opus_curve(e), basis=MODELLED,
+            note="Anthropic's published effort curve (SWE-bench Pro subset cost, SWE-bench Pro + Terminal-Bench 4.0 scores), anchored to AA's max row via AA's xhigh→max ratio"))
+add(row("claude", "Sonnet 5.5", "Sonnet 5.5 max", "max", **v2("Claude Code", "Sonnet 5.5", "max"), note="Creator report: 2% of weekly limit for $30.46, ≈$1,523/wk (n=1)"))
+for e in ("xhigh", "high", "medium", "low"):
+    add(row("claude", "Sonnet 5.5", f"Sonnet 5.5 {e}", e, **scaled("Claude Code", "Sonnet 5.5", e), basis=SCALED, note="Rescaled from AA's 5 Oct snapshot via the max row"))
+add(row("claude", "Fable 5.1", "Fable 5.1 max", "max", **v2("Claude Code", "Fable 5.1 (with fallback)", "max"), note="No Fable-specific capacity measurement"))
+add(row("claude", "Haiku 5.5", "Haiku 5.5 max", "max", **v2("Claude Code", "Haiku 5.5", "max"), note="Haiku is not in the measured traffic mix"))
+# ChatGPT
+add(row("chatgpt", "GPT-6.1 Sol", "GPT-6.1 Sol max", "max", **v2("Codex", "GPT-6.1 Sol", "max"), note="wokey: most measured Codex value comes from Sol-class models"))
+for e in ("xhigh", "high", "medium", "low"):
+    add(row("chatgpt", "GPT-6.1 Sol", f"GPT-6.1 Sol {e}", e, **scaled("Codex", "GPT-6.1 Sol", e), basis=SCALED, note="Rescaled from AA's 5 Oct snapshot via the max row"))
+add(row("chatgpt", "GPT-6 Astra", "GPT-6 Astra max", "max", **v2("Codex", "GPT-6 Astra", "max"), note="Model-matched capacity measurement on Pro $500"))
+for e in ("xhigh", "max", "high", "medium", "low"):
+    add(row("chatgpt", "GPT-6.1 Terra", f"Terra {e}", e, **v2("Codex", "GPT-6.1 Terra", e), note="Terra is not in any measured mix"))
+add(row("chatgpt", "GPT-6 Luna", "Luna max", "max", **v2("Codex", "GPT-6 Luna", "max"), note="Luna is not in any measured mix"))
+# Gemini, Grok
+add(row("gemini", "Gemini 4 Argon", "Gemini 4 Argon", "default", **v2("Antigravity CLI", "Gemini 4 Argon", "default"), note="Capacity is a scaled scenario, not a measurement"))
+add(row("gemini", "Gemini 3.8 Flash", "Gemini 3.8 Flash high", "high", **v2("Antigravity SDK", "Gemini 3.8 Flash", "high"), basis=PROXY, note="AA measured the SDK, not the CLI"))
+add(row("grok", "Grok 4.7", "Grok 4.7 xhigh", "xhigh", **v2("Grok Build", "Grok 4.7", "xhigh"), note="Single receipt (n=1), model-matched"))
+# Muse Code models on their own plan (capacity assumed, so inferred)
+for fam in ("Muse Spark 1.3", "Muse Wonder"):
+    add(row("muse", fam, f"{fam} max", "max", **v2("Muse Code", fam, "max"), note="AA measured Muse Code with its own API price"))
+# Muse Wonder Full has no API price (AA lists $0.00): price its tokens at Fable 5.1's cost per token in the same benchmark
+_rec = {r["model"]: r for r in V2 if r["agent"] in ("Muse Code", "Claude Code")}
+_fable_rate = _rec["Fable 5.1 (with fallback)"]["economics"]["costUsd"] / _rec["Fable 5.1 (with fallback)"]["usage"]["totalTokens"]
+_mwf = _rec["Muse Wonder Full"]
+add(row("muse", "Muse Wonder Full", "Muse Wonder Full max", "max", api=_mwf["usage"]["totalTokens"] * _fable_rate,
+        mins=_mwf["economics"]["durationSeconds"] / 60, idx=_mwf["benchmarks"]["aaIndex"], basis=MODELLED,
+        note=f"No API price: {_mwf['usage']['totalTokens'] / 1e6:.1f}M tokens/task priced at Fable 5.1's ${_fable_rate * 1e6:.2f}/M in this benchmark. Muse Code capacity is assumed, not measured"))
+# OpenCode Go (published per-model allowances; AA benchmarked these in other harnesses)
+for fam, (a, m, s) in (("DeepSeek V4.1 Flash", ("DeepSeek Harness", "DeepSeek V4.1 Flash 1017", "default")),
+                       ("Kimi K3", ("Kimi Code CLI", "Kimi K3", "default"))):
+    add(row("opencode", fam, fam, s, **v2(a, m, s), basis=PROXY,
+            note=f"Published ${GO_ALLOWANCE[fam]}/mo allowance; AA measured {a}, not OpenCode", go_allowance=GO_ALLOWANCE[fam]))
+# Other effort levels from AA's Intelligence Index curves, anchored to each model's coding row
+for plan, fam, (a, m, s), efforts, short in (
+        ("claude", "Fable 5.1", ("Claude Code", "Fable 5.1 (with fallback)", "max"), ("low", "medium", "high", "xhigh"), "Fable 5.1"),
+        ("claude", "Haiku 5.5", ("Claude Code", "Haiku 5.5", "max"), ("low", "medium", "high", "xhigh"), "Haiku 5.5"),
+        ("chatgpt", "GPT-6 Astra", ("Codex", "GPT-6 Astra", "max"), ("low", "medium", "high", "xhigh"), "GPT-6 Astra"),
+        ("chatgpt", "GPT-6 Luna", ("Codex", "GPT-6 Luna", "max"), ("low", "medium", "high", "xhigh"), "Luna"),
+        ("grok", "Grok 4.7", ("Grok Build", "Grok 4.7", "xhigh"), ("low", "high"), "Grok 4.7")):
+    base = v2(a, m, s)
+    bc, bi, bt = INTEL[fam][s]
+    for e in efforts:
+        c, i, t = INTEL[fam][e]
+        add(row(plan, fam, f"{short} {e}", e, api=base["api"] * c / bc, mins=base["mins"] * t / bt, idx=base["idx"] * i / bi, basis=MODELLED,
+                note=f"AA has no coding-agent row at {e}; modelled from AA's Intelligence Index effort curve for this model, anchored to its {s} coding row"))
+
+
+# ---------------- build ----------------
+def grade(r):
+    if r["basis"] == MODELLED:
+        return "modelled"
+    if r["basis"] in (SCALED, PROXY) or r["plan"] == "opencode":
+        return "inferred"
+    return "measured" if r["family"] in PLANS[r["plan"]]["models"] else "inferred"
+
+
+points = []
+for r in rows:
+    p = PLANS[r["plan"]]
+    if r["go_allowance"]:
+        cap, cap_note = r["go_allowance"], f"Published ${r['go_allowance']}/mo OpenCode Go allowance for this model"
+    elif r["family"] in p["models"]:
+        cap, cap_note = p["models"][r["family"]]
+    else:
+        cap, cap_note = p["plan_cap"], p["cap_src"]
+    tasks = cap / r["api"]
+    points.append(dict(provider=p["provider"], maker=FAMILY_MAKER.get(r["family"], MAKER.get(r["plan"])), via_go=r["plan"] == "opencode",
+                       plan=p["plan"], price=p["price"], label=r["label"], family=r["family"], effort=r["effort"], basis=r["basis"],
+                       idx=round(r["idx"], 1), api=round(r["api"], 4), mins=round(r["mins"], 2), monthly_cap=round(cap),
+                       tasks=round(tasks), per_task=round(p["price"] / tasks, 5), grade=grade(r),
+                       note=f"{r['note']}. Capacity: {cap_note}."))
+
+bench = dict(name="Agentic coding", long="Artificial Analysis Coding Agent Index v2.0 (27 Oct 2026)", task="AA coding-agent task",
+             score="AA Coding Agent Index", url="https://artificialanalysis.ai/agents/coding-agents",
+             about="One task is one attempt at one of 290 agentic coding tasks (FrontierCode v1.1, Terminal-Bench 4.0, SWE-Atlas-QnA-AA) in the model's own harness. "
+                   "Only Claude and Sol max rows are current-index data; lower Sonnet and Sol efforts are rescaled from AA's 5 Oct snapshot, lower Opus efforts are "
+                   "modelled from Anthropic's published effort curve, and other efforts for Fable, Haiku, Astra, Luna and Grok are modelled from AA's own "
+                   "Intelligence Index effort curves.",
+             top=max(p["idx"] for p in points), median=statistics.median(p["idx"] for p in points), modes={"public": points})
+plans = {k: dict(provider=v["provider"], plan=v["plan"], price=v["price"], public=v["plan_cap"],
+                 sources=[note for _, note in v["models"].values()] + [v["cap_src"]], cap_url=v["cap_url"], alt=v["alt"])
+         for k, v in PLANS.items()}
+os.makedirs(os.path.dirname(OUT) or ".", exist_ok=True)
+json.dump(dict(benchmarks={"coding": bench}, plans=plans), open(OUT, "w"), indent=1)
+print(f"wrote {OUT}: {len(points)} points")

@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coding Subscription Value</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10); --wash: rgba(11,11,11,0.05);
+  --hard: #2a78d6; --medium: #eb6834; --easy: #1baf7a;
+  --p-claude: #d97757; --p-chatgpt: #10a37f; --p-gemini: #8a5cf5; --p-muse: #0866ff; --p-deepseek: #4d6bfe; --p-kimi: #0b0b0b; --p-grok: #0b0b0b; --p-opencode: #6b6a66;
+  --on-claude: #ffffff; --on-chatgpt: #ffffff; --on-gemini: #ffffff; --on-grok: #ffffff; --on-opencode: #ffffff; --on-muse: #ffffff; --on-deepseek: #ffffff; --on-kimi: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
+    --hard: #3987e5; --medium: #d95926; --easy: #199e70;
+    --p-claude: #e08a6d; --p-chatgpt: #19c37d; --p-gemini: #a585ff; --p-muse: #3d8bff; --p-deepseek: #7b93ff; --p-kimi: #f0efec; --p-grok: #f0efec; --p-opencode: #a3a29b;
+    --on-claude: #ffffff; --on-chatgpt: #0b0b0b; --on-gemini: #ffffff; --on-grok: #0b0b0b; --on-opencode: #0b0b0b; --on-muse: #ffffff; --on-deepseek: #0b0b0b; --on-kimi: #0b0b0b;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
+  --hard: #3987e5; --medium: #d95926; --easy: #199e70;
+  --p-claude: #e08a6d; --p-chatgpt: #19c37d; --p-gemini: #a585ff; --p-muse: #3d8bff; --p-deepseek: #7b93ff; --p-kimi: #f0efec; --p-grok: #f0efec; --p-opencode: #a3a29b;
+  --on-claude: #ffffff; --on-chatgpt: #0b0b0b; --on-gemini: #ffffff; --on-grok: #0b0b0b; --on-opencode: #0b0b0b; --on-muse: #ffffff; --on-deepseek: #0b0b0b; --on-kimi: #0b0b0b;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 18px; margin: 40px 0 8px; }
+.sub { color: var(--ink2); margin: 0 0 24px; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 16px; }
+.swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-bottom: 12px; }
+.seg { display: inline-flex; background: var(--wash); border: 1px solid var(--ring); border-radius: 10px; padding: 3px; }
+.seg button { font: inherit; font-size: 14px; color: var(--ink2); background: none; border: 0; border-radius: 7px; padding: 6px 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.seg button:focus-visible { outline: 2px solid var(--hard); outline-offset: 1px; }
+.tierdesc { color: var(--ink2); font-size: 13px; }
+
+.panel { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; align-items: start; }
+@media (max-width: 820px) { .panel { grid-template-columns: 1fr; } }
+.rec .label { font-size: 12px; color: var(--ink2); text-transform: uppercase; letter-spacing: 0.04em; }
+.rec .pick { font-size: 17px; font-weight: 600; margin: 4px 0 0; }
+.rec .plan { color: var(--ink2); font-size: 13px; }
+.rec .big { font-size: 30px; font-weight: 600; margin-top: 6px; }
+.rec .big small { font-size: 13px; font-weight: 400; color: var(--ink2); }
+.rec .meta { color: var(--ink2); font-size: 13px; }
+.rec .block { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--grid); font-size: 13px; color: var(--ink2); }
+.rec .block b { color: var(--ink); }
+.rank { list-style: none; padding: 0; margin: 6px 0 0; }
+.rank li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; font-size: 13px; }
+.rank li span:last-child { font-variant-numeric: tabular-nums; color: var(--ink); }
+
+.chartwrap { position: relative; }
+svg text { fill: var(--muted); font-size: 11px; }
+svg .lbl { fill: var(--ink2); font-size: 11px; }
+svg .lbl.win { fill: var(--ink); font-weight: 600; }
+svg .pt { transition: opacity 200ms ease; }
+svg .pt.off { opacity: 0.12; }
+svg .pt.dim { opacity: 0.32; }
+svg .pt.faint { opacity: 0.12; }
+svg .pt.focus.off-f { opacity: 0.55; }
+tr.hl td { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+tr.hl td:first-child { box-shadow: inset 3px 0 0 var(--ink2); }
+svg .pt:hover, svg .pt:focus { opacity: 1; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink2); margin: 0 0 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); display: none; max-width: 280px; z-index: 2; }
+.tip b { color: var(--ink); }
+.tip div { color: var(--ink2); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--ink2); font-weight: 600; white-space: nowrap; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.win td { background: var(--wash); }
+.grade { font-size: 12px; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--axis); white-space: nowrap; }
+.grade.measured, .grade.own { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.grade.own { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--ink); }
+.grade.modelled { border-style: dashed; }
+.capbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 24px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; }
+\1
+.sliders { display: flex; flex-wrap: wrap; gap: 8px 20px; flex-basis: 100%; }
+.slider { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink2); }
+.slider input { width: 150px; }
+.slider b { color: var(--ink); min-width: 70px; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.chip { font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 99px; border: 1px solid var(--ring); background: var(--surface); color: var(--ink2); cursor: pointer; }
+.chip:hover { color: var(--ink); border-color: var(--axis); }
+.chip[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); font-weight: 600; }
+.chip.all { padding-left: 10px; }
+.chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+ul { padding-left: 20px; } li { margin: 4px 0; }
+.note { color: var(--ink2); font-size: 13px; }
+a { color: var(--hard); }
+</style>
+</head>
+<body>
+<main>
+<h1>Which subscription gives the most coding tasks per dollar</h1>
+<p class="sub">Valued at 100% of each plan's weekly cap. Benchmark: AA Coding Agent Index v2.0 (27 Oct 2026). Plans: the top plan from each provider, and OpenCode Go for models without one. Data as of 4 Nov 2026; page built __BUILT__.</p>
+<div class="capbar">
+  <span class="k">Benchmark</span>
+  <span class="tierdesc" id="benchabout" style="flex-basis:100%"></span>
+</div>
+<span class="tierdesc" id="capdesc"></span>
+</div>
+
+<div class="controls">
+  <div class="seg" role="group" aria-label="Cost and time axis scale" data-scale-for="1">
+    <button type="button" data-scale="log">Log</button>
+    <button type="button" data-scale="linear">Linear</button>
+  </div>
+  <div class="seg" role="group" aria-label="Vertical axis" id="yseg">
+    <button type="button" data-y="time">Time</button>
+    <button type="button" data-y="score">Score</button>
+  </div>
+  <div class="sliders"><label class="slider">Minimum score <input type="range" id="minScore" aria-describedby="minScoreOut"> <b id="minScoreOut">off</b></label><label class="slider">Maximum $/task <input type="range" id="maxCost" aria-describedby="maxCostOut"> <b id="maxCostOut">off</b></label><label class="slider">Maximum minutes <input type="range" id="maxMins" aria-describedby="maxMinsOut"> <b id="maxMinsOut">off</b></label></div>
+</div>
+<div class="filters" id="filters" role="group" aria-label="Filter by provider"></div>
+
+<div class="panel">
+  <div>
+    <div class="legend" id="legend"></div>
+    <div class="card chartwrap"><svg id="chart" role="img" aria-label="Scatter of minutes per task against subscription cost per task, with the cost-speed frontier"></svg><div class="tip" id="tip"></div></div>
+    <p class="note">Switch the vertical axis between time (lower is better) and score (higher is better). Set a minimum score, a maximum cost per task and a maximum time for the work you're routing; models outside those limits fade out and leave the ranking. The grey band is the frontier among the remaining models: on the time view, nothing else is both cheaper and faster; on the score view, nothing cheaper scores higher. Points on it are in full colour; faded points are beaten. The cheapest measured point has a larger badge and a bold label. Click a provider to show only its models, or tap a point to highlight that model at every effort level (tap it again, or the ✕ chip, to clear). Filled points have measured capacity; hollow are inferred and dashed are modelled. Only filled points are recommended.</p>
+  </div>
+  <div class="card rec" id="rec" aria-live="polite"></div>
+</div>
+
+<h2 id="tblhead">All points</h2>
+<div class="card tablewrap"><table id="tbl"></table></div>
+
+<h2>Plans and capacity</h2>
+<div class="card tablewrap"><table id="plans"></table></div>
+
+<h2>Gaps</h2>
+<div class="card">
+<ul>
+<li><b>Muse capacity is assumed.</b> Meta publishes Muse Code limits only as prompts per 5 hours (Maximum = 80× Everyday), so Muse Code Maximum ($200) is assumed to return the same API-equivalent value per dollar as Claude Ultra's measured $1,549/wk. Muse Spark 1.3 and Muse Wonder use AA's measured API cost. Muse Wonder Full has no API price (AA lists $0.00), so its tokens are priced at Fable 5.1's cost per token and it is drawn as modelled.</li>
+<li><b>DeepSeek and Kimi come through OpenCode Go.</b> They have no top plan of their own here, so they use OpenCode Go ($10) with its published per-model allowances. Their logos show the model maker. Kimi K3.1 Pro isn't plotted: AA hasn't published a coding-agent row for it.</li>
+<li><b>Gemini has no measured capacity.</b> Google publishes no Antigravity quota. The plotted capacity is a September scenario for the Ultra 5× tier ($1,890–$5,671/month), scaled 4× for Ultra 20×. Gemini 4 Carbon scores 59 on Antigravity but isn't generally available and has no cost or time row yet.</li>
+<li><b>Grok rests on one receipt.</b> SuperGrok Heavy capacity comes from one account's meter movement. SuperGrok ($30) has no measurement, so there's no way to tell which Grok plan is better value.</li>
+<li><b>OpenCode harness mismatch.</b> AA tested OpenCode only with GLM-5.3, and GLM-5.3 isn't in Go's published list. Every Go point therefore uses another harness's benchmark row as a proxy.</li>
+<li><b>Effort levels.</b> The coding-agent index (v2.0) tests Claude models and GPT-6.1 Sol at max only. Sonnet 5.5 and Sol at low–xhigh come from AA's 5 Oct snapshot, rescaled to v2.0 through each model's max row, and are graded inferred. Opus 5.5 at low–xhigh is modelled from Anthropic's own effort curve: cost from its SWE-bench Pro subset ($0.11 low, $0.21 medium, $0.29 high, $0.74 xhigh per task), score from the average of its SWE-bench Pro and Terminal-Bench 4.0 results relative to xhigh, and time from AA's Opus tokens per task at each effort. Anthropic publishes no max row, so the xhigh→max step uses AA's own Opus effort data (cost ×1.66, score ×1.047). These points are drawn with a dashed ring and never recommended. Where AA's Intelligence Index ran a model at every effort (Fable, Haiku, Astra, Luna, Grok), its effort curve is applied to the coding row; those points are modelled too.</li>
+</ul>
+</div>
+
+<h2>Method</h2>
+<div class="card">
+<ul>
+<li><b>Tasks per month</b> = monthly API-equivalent capacity ÷ AA API cost per task. Weekly measurements are scaled by 52/12.</li>
+<li><b>Subscription $/task</b> = plan price ÷ tasks per month. An earlier version divided this by the score to get "$ per success". That treated the score as a retry rate, as if every failed task would eventually pass, and it made cheap weak models (Luna low) look best. The main chart now plots cost against time and uses the score only as a minimum you set.</li>
+<li><b>Evidence grades.</b> Measured: a third-party capacity measurement that includes this model's traffic, plus an AA v2.0 row in the plan's own harness. Inferred: plan-level capacity applied to a model outside the measured mix, a scaled scenario, a proxy harness, or an effort row rescaled from the older snapshot. Modelled: no published benchmark at all, estimated from a sibling model. Only measured points are recommended.</li>
+<li><b>Caveat.</b> Every capacity figure is an estimate from a third party or a scenario. None comes from a vendor contract. The method assumes a plan meters each model at its API price, which providers don't promise: wokey reports that Opus 5.5 uses about 0.6× the limit per token of other Opus models. Five-hour windows are ignored; the report assumes 100% of the weekly cap is used.</li>
+</ul>
+<p class="note">Sources: <a href="https://artificialanalysis.ai/agents/coding-agents">AA Coding Agent Index</a> (data via <a href="https://github.com/hraness/aicharts/blob/main/data/coding-agents.json">hraness/aicharts</a>, retrieved 27 Oct 2026) ·
+<a href="https://wokey.ai/claude-usage-limits">wokey Claude limits</a> · <a href="https://wokey.ai/codex-usage-limits">wokey Codex limits</a> ·
+<a href="https://aiandtractors.com/coding-agent-subscription-costs/">aiandtractors subscription costs</a> · <a href="https://opencode.ai/go">OpenCode Go</a> ·
+<a href="https://ratelimitnow.com/limits/muse-code/">Muse Code limits</a> · <a href="https://digintoai.com/en/articles/gemini-4-argon-usage-limits">Gemini 4 Argon limits</a> ·
+<a href="https://the-decoder.com/google-deepmind-releases-gemini-4-carbon-just-two-weeks-after-argon-with-gains-across-the-board/">The Decoder on Gemini 4 Carbon</a> · <a href="https://www.benchleader.com/effort">BenchLeader effort data</a> (CC BY 4.0, used for effort curves) · <a href="https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence">Anthropic effort guidance</a></p>
+</div>
+<p class="note" style="margin-top:24px">Source and method: <a href="https://github.com/seankoji-com/ai-subscription-value">github.com/seankoji-com/ai-subscription-value</a>. Estimates from public data; not affiliated with any provider.</p>
+</main>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>__LOGOS__</defs></svg>
+<script>
+const DATA = __DATA__;
+const P = DATA.points;
+const TIERS = { hard: "Hard", medium: "Medium", easy: "Easy" };
+const RANK = { easy: 0, medium: 1, hard: 2 };
+const SHAPES = { "Claude": "circle", "ChatGPT": "square", "Gemini": "diamond", "Grok": "triangle", "OpenCode Go": "tridown" };
+const LABELLED = new Set(["Opus 5.5 max", "Sonnet 5.5 max", "GPT-6.1 Sol max", "GPT-6 Astra max", "Grok 4.7 xhigh",
+  "Luna max", "Terra low", "DeepSeek V4.1 Flash", "Gemini 4 Argon", "Fable 5.1 max", "Kimi K3 (Go)"]);
+const LEFT = new Set(["GPT-6.1 Sol max"]);
+const ABOVE = new Set(["Sonnet 5.5 max"]);
+const usd = v => v >= 1 ? "$" + v.toFixed(2) : "$" + v.toFixed(3);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const qualifies = (p, t) => RANK[p.tier] >= RANK[t];
+
+const hardMin = DATA.top - 5;
+document.getElementById("topv").textContent = DATA.top.toFixed(1);
+document.getElementById("hardv").textContent = hardMin.toFixed(1);
+document.getElementById("medv").textContent = "≥ " + DATA.median.toFixed(1);
+const DESC = {
+  easy: "Any model counts. Every point is in play.",
+  medium: `Index ≥ ${DATA.median.toFixed(1)} (the field median).`,
+  hard: `Index ≥ ${hardMin.toFixed(1)} (within 5 points of the top score, ${DATA.top.toFixed(1)}).`,
+};
+
+let tier = "easy";
+try { const s = localStorage.getItem("subvalue-tier"); if (s in TIERS) tier = s; } catch (e) {}
+if (location.hash.slice(1) in TIERS) tier = location.hash.slice(1);
+
+function picks(t) {
+  const q = P.filter(p => qualifies(p, t)).sort((a, b) => a.per_success - b.per_success);
+  return { q, measured: q.filter(p => p.grade === "measured"), inferred: q.filter(p => p.grade === "inferred") };
+}
+
+function shape(kind, r, fill, stroke, sw) {
+  const a = `fill="${fill}" stroke="${stroke}" stroke-width="${sw}"`;
+  if (kind === "circle") return `<circle r="${r}" ${a}/>`;
+  if (kind === "square") return `<rect x="${-r * 0.9}" y="${-r * 0.9}" width="${r * 1.8}" height="${r * 1.8}" rx="1.5" ${a}/>`;
+  if (kind === "diamond") return `<polygon points="0,${-r * 1.2} ${r * 1.2},0 0,${r * 1.2} ${-r * 1.2},0" ${a}/>`;
+  if (kind === "triangle") return `<polygon points="0,${-r * 1.15} ${r * 1.1},${r * 0.8} ${-r * 1.1},${r * 0.8}" ${a}/>`;
+  return `<polygon points="0,${r * 1.15} ${r * 1.1},${-r * 0.8} ${-r * 1.1},${-r * 0.8}" ${a}/>`;
+}
+
+// Legend
+const lg = document.getElementById("legend");
+for (const t of ["hard", "medium", "easy"]) lg.insertAdjacentHTML("beforeend", `<span><span class="swatch" style="background:var(--${t})"></span>${TIERS[t]}</span>`);
+for (const [prov, sh] of Object.entries(SHAPES)) lg.insertAdjacentHTML("beforeend", `<span><svg width="14" height="14" viewBox="-7 -7 14 14">${shape(sh, 5, "none", "var(--ink2)", 1.5)}</svg>${prov}</span>`);
+lg.insertAdjacentHTML("beforeend", `<span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5" fill="var(--ink2)"/></svg>Measured</span><span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="4.5" fill="none" stroke="var(--ink2)" stroke-width="1.5"/></svg>Inferred</span><span><svg width="18" height="18" viewBox="-9 -9 18 18"><circle r="7.5" fill="none" stroke="var(--ink)" stroke-width="1.5"/></svg>Best measured for tier</span>`);
+
+function drawChart() {
+  const svg = document.getElementById("chart");
+  const W = svg.parentElement.clientWidth - 32, H = Math.max(340, Math.min(500, W * 0.65));
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  const m = { l: 56, r: 16, t: 12, b: 44 };
+  const xs = [10, 20, 50, 100, 200], ys = [0.03, 0.1, 0.3, 1, 3, 10];
+  const lx = v => Math.log10(v), X0 = lx(10), X1 = lx(220), Y0 = lx(0.03), Y1 = lx(10);
+  const sx = v => m.l + (lx(v) - X0) / (X1 - X0) * (W - m.l - m.r);
+  const sy = v => H - m.b - (lx(v) - Y0) / (Y1 - Y0) * (H - m.t - m.b);
+  const { measured } = picks(tier), best = measured[0];
+  let g = "";
+  for (const v of xs) g += `<line x1="${sx(v)}" x2="${sx(v)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--grid)"/><text x="${sx(v)}" y="${H - m.b + 16}" text-anchor="middle">${v}</text>`;
+  for (const v of ys) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${sy(v) + 4}" text-anchor="end">$${v}</text>`;
+  g += `<line x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}" stroke="var(--axis)"/>`;
+  g += `<text x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">Minutes per successful task (log)</text>`;
+  g += `<text transform="translate(14 ${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle">Subscription $ per success (log)</text>`;
+  // Faded points first, then qualifying inferred, then measured, so in-play marks sit on top.
+  const order = [...P].sort((a, b) => (qualifies(a, tier) - qualifies(b, tier)) || ((a.grade === "measured") - (b.grade === "measured")));
+  let labels = "";
+  for (const p of order) {
+    const on = qualifies(p, tier), x = sx(p.mins_success), y = sy(p.per_success), col = `var(--${p.tier})`, filled = p.grade === "measured";
+    const win = best && p === best;
+    g += `<g class="pt${on ? "" : " off"}" data-i="${P.indexOf(p)}" transform="translate(${x} ${y})" tabindex="${on ? 0 : -1}">
+      <circle r="12" fill="transparent"/>
+      ${win ? `<circle r="11" fill="none" stroke="var(--ink)" stroke-width="1.5"/>` : ""}
+      ${shape(SHAPES[p.provider], filled ? 6 : 5.5, filled ? col : "var(--surface)", filled ? "var(--surface)" : col, 2)}</g>`;
+    if (on && (LABELLED.has(p.label) || win)) {
+      const off = win ? 16 : 10;
+      if (ABOVE.has(p.label)) {
+        labels += `<text class="lbl${win ? " win" : ""}" x="${Math.min(x, W - m.r - 40)}" y="${y - off - 2}" text-anchor="middle">${esc(p.label)}</text>`;
+      } else {
+        const right = x < W - 140 && !LEFT.has(p.label);
+        labels += `<text class="lbl${win ? " win" : ""}" x="${x + (right ? off : -off)}" y="${y + 4}" text-anchor="${right ? "start" : "end"}">${esc(p.label)}</text>`;
+      }
+    }
+  }
+  svg.innerHTML = g + labels;
+  const tip = document.getElementById("tip");
+  const show = el => {
+    const p = P[+el.dataset.i];
+    tip.innerHTML = `<b>${esc(p.label)}</b> <span class="grade ${p.grade}">${p.grade}</span>
+      <div>${esc(p.plan)} · ${esc(p.harness)} · effort ${esc(p.effort)}</div>
+      <div>${usd(p.per_success)} per success (${usd(p.per_task)} per task)</div>
+      <div>${p.mins_success} min per success · index ${p.idx} (${TIERS[p.tier]})</div>
+      <div>${p.tasks.toLocaleString()} tasks/mo · API ${usd(p.api)}/task</div>
+      <div style="margin-top:4px">${esc(p.note)}</div>`;
+    tip.style.display = "block";
+    const bx = el.getBoundingClientRect(), wrap = svg.parentElement.getBoundingClientRect();
+    let left = bx.left - wrap.left + 18; if (left > wrap.width - 290) left = Math.max(4, bx.left - wrap.left - 290);
+    tip.style.left = left + "px"; tip.style.top = Math.max(0, bx.top - wrap.top - 10) + "px";
+  };
+  const hide = () => tip.style.display = "none";
+  svg.querySelectorAll(".pt:not(.off)").forEach(el => {
+    el.addEventListener("mouseenter", () => show(el));
+    el.addEventListener("focus", () => show(el));
+    el.addEventListener("click", () => show(el));
+    el.addEventListener("mouseleave", hide);
+    el.addEventListener("blur", hide);
+  });
+}
+
+function drawRec() {
+  const { q, measured, inferred } = picks(tier), best = measured[0], alt = inferred[0];
+  let h = `<div class="label">Best measured · ${TIERS[tier]} tasks</div>`;
+  if (best) {
+    h += `<div class="pick">${esc(best.label)}</div><div class="plan">${esc(best.plan)}</div>
+      <div class="big">${usd(best.per_success)} <small>per success</small></div>
+      <div class="meta">${best.tasks.toLocaleString()} tasks/mo at full cap · ${best.mins_success} min per success · index ${best.idx}</div>`;
+  } else h += `<div class="pick">No measured option qualifies</div>`;
+  h += `<div class="block"><b>Measured ranking</b><ol class="rank">${measured.map(p => `<li><span>${esc(p.label)}</span><span>${usd(p.per_success)}</span></li>`).join("")}</ol></div>`;
+  if (alt && best && alt.per_success < best.per_success)
+    h += `<div class="block">Cheapest inferred, worth verifying: <b>${esc(alt.label)}</b> (${esc(alt.provider)}) at ${usd(alt.per_success)}, ${(best.per_success / alt.per_success).toFixed(1)}× cheaper if the estimate holds.</div>`;
+  else if (alt) h += `<div class="block">No inferred option is cheaper. The closest is ${esc(alt.label)} at ${usd(alt.per_success)}.</div>`;
+  h += `<div class="block">${q.length} of ${P.length} plotted points qualify.</div>`;
+  document.getElementById("rec").innerHTML = h;
+}
+
+function drawTable() {
+  const { q, measured } = picks(tier), best = measured[0];
+  document.getElementById("tblhead").textContent = `Qualifying points: ${TIERS[tier]} (${q.length})`;
+  document.getElementById("tbl").innerHTML = `<thead><tr><th>Provider</th><th>Model · effort</th><th>Tier</th><th>Evidence</th><th class="n">Index</th><th class="n">API $/task</th><th class="n">Tasks/mo</th><th class="n">Sub $/task</th><th class="n">Sub $/success</th><th class="n">Min/success</th><th>Note</th></tr></thead><tbody>` +
+    q.map(p => `<tr class="${p === best ? "win" : ""}"><td>${esc(p.provider)}</td><td>${esc(p.label)}</td><td style="white-space:nowrap"><span class="swatch" style="background:var(--${p.tier})"></span> ${TIERS[p.tier]}</td><td><span class="grade ${p.grade}">${p.grade}</span></td><td class="n">${p.idx}</td><td class="n">${usd(p.api)}</td><td class="n">${p.tasks.toLocaleString()}</td><td class="n">${usd(p.per_task)}</td><td class="n"><b>${usd(p.per_success)}</b></td><td class="n">${p.mins_success}</td><td class="note">${esc(p.note)}</td></tr>`).join("") + "</tbody>";
+}
+
+function render() {
+  document.querySelectorAll("#seg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tier === tier)));
+  document.getElementById("tierdesc").textContent = DESC[tier];
+  drawChart(); drawRec(); drawTable();
+}
+
+document.querySelectorAll("#seg button").forEach(b => b.addEventListener("click", () => {
+  tier = b.dataset.tier;
+  try { localStorage.setItem("subvalue-tier", tier); } catch (e) {}
+  history.replaceState(null, "", "#" + tier);
+  render();
+}));
+document.getElementById("seg").addEventListener("keydown", e => {
+  const order = ["easy", "medium", "hard"], i = order.indexOf(tier);
+  const n = e.key === "ArrowRight" ? Math.min(2, i + 1) : e.key === "ArrowLeft" ? Math.max(0, i - 1) : i;
+  if (n !== i) { document.querySelector(`#seg button[data-tier="${order[n]}"]`).click(); document.querySelector(`#seg button[data-tier="${order[n]}"]`).focus(); }
+});
+addEventListener("resize", drawChart);
+render();
+
+// ---- Chart 2: per AA task, with Pareto frontier ----
+let measuredOnly = false;
+try { measuredOnly = localStorage.getItem("subvalue-measured") === "1"; } catch (e) {}
+document.getElementById("measuredOnly").checked = measuredOnly;
+document.getElementById("measuredOnly").addEventListener("change", e => {
+  measuredOnly = e.target.checked;
+  try { localStorage.setItem("subvalue-measured", measuredOnly ? "1" : "0"); } catch (err) {}
+  drawChart2();
+});
+const lg2 = document.getElementById("legend2");
+for (const [prov, sh] of Object.entries(SHAPES)) lg2.insertAdjacentHTML("beforeend", `<span><svg width="14" height="14" viewBox="-7 -7 14 14">${shape(sh, 5, "none", "var(--ink2)", 1.5)}</svg>${prov}</span>`);
+lg2.insertAdjacentHTML("beforeend", `<span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5" fill="var(--hard)"/></svg>On frontier</span><span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5" fill="var(--muted)"/></svg>Dominated</span><span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="4.5" fill="none" stroke="var(--ink2)" stroke-width="1.5"/></svg>Inferred (hollow)</span><span><svg width="26" height="10"><line x1="1" x2="25" y1="5" y2="5" stroke="var(--hard)" stroke-width="2" stroke-dasharray="2 4" stroke-linecap="round"/></svg>Frontier</span>`);
+
+function frontierOf(pts) {
+  // Sort fastest first; a point is on the frontier if it is cheaper than every faster point.
+  const s = [...pts].sort((a, b) => a.mins - b.mins || a.per_task - b.per_task);
+  const f = []; let best = Infinity;
+  for (const p of s) if (p.per_task < best) { f.push(p); best = p.per_task; }
+  return f;
+}
+
+function drawChart2() {
+  const svg = document.getElementById("chart2");
+  const W = svg.parentElement.clientWidth - 32, H = Math.max(340, Math.min(500, W * 0.65));
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  const m = { l: 56, r: 16, t: 12, b: 44 };
+  const xs = [5, 10, 20, 50, 100], ys = [0.01, 0.03, 0.1, 0.3, 1, 3];
+  const lx = v => Math.log10(v), X0 = lx(5), X1 = lx(110), Y0 = lx(0.01), Y1 = lx(5);
+  const sx = v => m.l + (lx(v) - X0) / (X1 - X0) * (W - m.l - m.r);
+  const sy = v => H - m.b - (lx(v) - Y0) / (Y1 - Y0) * (H - m.t - m.b);
+  const pts = P.filter(p => !measuredOnly || p.grade === "measured");
+  const fr = frontierOf(pts), onF = new Set(fr);
+  let g = "";
+  for (const v of xs) g += `<line x1="${sx(v)}" x2="${sx(v)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--grid)"/><text x="${sx(v)}" y="${H - m.b + 16}" text-anchor="middle">${v}</text>`;
+  for (const v of ys) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${sy(v) + 4}" text-anchor="end">$${v}</text>`;
+  g += `<line x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}" stroke="var(--axis)"/>`;
+  g += `<text x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">Minutes per AA task (log)</text>`;
+  g += `<text transform="translate(14 ${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle">Subscription $ per AA task (log)</text>`;
+  if (fr.length > 1) g += `<polyline points="${fr.map(p => `${sx(p.mins)},${sy(p.per_task)}`).join(" ")}" fill="none" stroke="var(--hard)" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round"/>`;
+  let labels = "";
+  const order = [...pts].sort((a, b) => onF.has(a) - onF.has(b));
+  for (const p of order) {
+    const x = sx(p.mins), y = sy(p.per_task), f = onF.has(p), col = f ? "var(--hard)" : "var(--muted)", filled = p.grade === "measured";
+    g += `<g class="pt" data-i="${P.indexOf(p)}" transform="translate(${x} ${y})" tabindex="0">
+      <circle r="12" fill="transparent"/>
+      ${shape(SHAPES[p.provider], filled ? 6 : 5.5, filled ? col : "var(--surface)", filled ? "var(--surface)" : col, 2)}</g>`;
+    if (f) {
+      labels += `<text class="lbl win" x="${x}" y="${y - 14}" text-anchor="middle">${esc(p.label)}</text>`;
+    } else if (p.grade === "measured") {
+      const right = x < W - 150;
+      labels += `<text class="lbl${f ? " win" : ""}" x="${x + (right ? 10 : -10)}" y="${y + 4}" text-anchor="${right ? "start" : "end"}">${esc(p.label)}</text>`;
+    }
+  }
+  svg.innerHTML = g + labels;
+  const tip = document.getElementById("tip2");
+  const show = el => {
+    const p = P[+el.dataset.i];
+    tip.innerHTML = `<b>${esc(p.label)}</b> <span class="grade ${p.grade}">${p.grade}</span>
+      <div>${esc(p.plan)} · ${esc(p.harness)} · effort ${esc(p.effort)}</div>
+      <div>${usd(p.per_task)} per AA task · ${p.mins} min per task</div>
+      <div>${p.tasks.toLocaleString()} tasks/mo at full cap · index ${p.idx}</div>
+      <div>${onF.has(p) ? "On the frontier" : "Dominated: another point is both cheaper and faster"}</div>
+      <div style="margin-top:4px">${esc(p.note)}</div>`;
+    tip.style.display = "block";
+    const bx = el.getBoundingClientRect(), wrap = svg.parentElement.getBoundingClientRect();
+    let left = bx.left - wrap.left + 18; if (left > wrap.width - 290) left = Math.max(4, bx.left - wrap.left - 290);
+    tip.style.left = left + "px"; tip.style.top = Math.max(0, bx.top - wrap.top - 10) + "px";
+  };
+  const hide = () => tip.style.display = "none";
+  svg.querySelectorAll(".pt").forEach(el => {
+    el.addEventListener("mouseenter", () => show(el)); el.addEventListener("focus", () => show(el));
+    el.addEventListener("click", () => show(el)); el.addEventListener("mouseleave", hide); el.addEventListener("blur", hide);
+  });
+  document.getElementById("frontier").innerHTML = `<div class="label">Frontier · fastest to cheapest</div>
+    <ol class="rank" style="margin-top:8px">${fr.map(p => `<li><span>${esc(p.label)} <span class="grade ${p.grade}">${p.grade}</span><br><span class="meta">${esc(p.provider)} · ${p.mins} min</span></span><span>${usd(p.per_task)}</span></li>`).join("")}</ol>
+    <div class="block">${fr.length} of ${pts.length} points are on the frontier. Every other point is beaten on both cost and time. The frontier ignores success rate: a cheap, fast model can still fail more often (see index in the tooltip).</div>`;
+}
+drawChart2();
+addEventListener("resize", drawChart2);
+
+// Plans table (static)
+document.getElementById("plans").innerHTML = `<thead><tr><th>Provider</th><th>Plan used</th><th class="n">Price/mo</th><th class="n">Capacity/mo (API $)</th><th>Capacity evidence</th><th>Why this plan</th></tr></thead><tbody>` +
+  Object.values(DATA.plans).map(p => `<tr><td>${esc(p.provider)}</td><td>${esc(p.plan)}</td><td class="n">$${p.price}</td><td class="n">${p.monthly ? "$" + Math.round(p.monthly).toLocaleString() : "per model"}</td><td class="note"><a href="${esc(p.cap_url)}">${esc(p.cap_src)}</a></td><td class="note">${esc(p.alt)}</td></tr>`).join("") +
+  `<tr><td>Meta Muse</td><td>Muse Code Power ($50) / Maximum ($200)</td><td class="n">$50 / $200</td><td class="n">unknown</td><td class="note"><a href="https://ratelimitnow.com/limits/muse-code/">Prompts per 5h only (20× / 80× Everyday's 10–50)</a></td><td class="note">Tied on multiplier per dollar; not plotted (see Gaps).</td></tr></tbody>`;
+</script>
+</body>
+</html>
