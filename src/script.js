@@ -374,6 +374,10 @@ function drawGlance() {
   const measured = ALL.filter(p => ELIGIBLE(p.grade));
   const cheapest = [...measured].sort((a, b) => a.per_task - b.per_task)[0];
   const fastest = [...measured].sort((a, b) => a.mins - b.mins)[0];
+  if (!cheapest || !fastest) {
+    document.getElementById("glance").innerHTML = `<div class="glance-head">At a glance</div><div class="glance-row"><span class="glabel">Measured</span><span class="gval">None</span></div>`;
+    return;
+  }
   const rows = [
     ["Work per $100", `${Math.round(100 / cheapest.per_task)} tasks`, `${cheapest.label} on ${cheapest.plan}`],
     ["Fastest measured", `${fastest.mins} min/task`, `${fastest.label} · ${usd(fastest.per_task)}/task · score ${fastest.idx}`],
@@ -408,10 +412,11 @@ function drawValueBars() {
         <div class="vb-track" aria-hidden="true"></div>
         <div class="vb-val"><b>—</b><span>${barsFloor === "measured" ? "No measured point" : `No point ≥ ${barsFloor}`}</span></div>
       </div>`;
-    const name = best.via_go ? esc(best.maker) : esc(pl.provider);
-    const col = pcol(best.maker);
+    const bestBadge = MAKERS[best.maker] ? makerBadge(best.maker) : goBadge;
+    const col = MAKERS[best.maker] ? pcol(best.maker) : "var(--p-opencode)";
+    const name = esc(best.maker || pl.provider);
     return `<div class="vb-row">
-        <div class="vb-name">${makerBadge(best.maker)} ${name} ${gradePill(best.grade)}<span class="vb-plan">${esc(pl.plan)} · ${esc(best.label)}${best.via_go ? " · via Go" : ""}</span></div>
+        <div class="vb-name">${bestBadge} ${name} ${gradePill(best.grade)}<span class="vb-plan">${esc(pl.plan)} · ${esc(best.label)}${best.via_go ? " · via Go" : ""}</span></div>
         <div class="vb-track" aria-hidden="true"><div class="vb-fill ${best.grade}" style="--bar:${col};width:${Math.max(6, (1 / best.per_task) / maxWork * 100).toFixed(1)}%"></div></div>
         <div class="vb-val"><b>${Math.round(100 / best.per_task)} tasks</b><span>${usd(best.per_task)}/task<br>score ${best.idx}</span></div>
       </div>`;
