@@ -69,12 +69,12 @@ if (qScale === "log" || qScale === "linear") scale[1] = scale[2] = qScale;
 
 // Badge: maker logo in a round badge. Measured: filled. Inferred: hollow ring. Modelled: dashed ring.
 const R = 11;
-function badge(p, withLogo = true) {
+function badge(p, withLogo = true, r = R) {
   const m = MAKERS[p.maker], s = 14, col = pcol(p), filled = ELIGIBLE(p.grade), dash = p.grade === "modelled" ? ` stroke-dasharray="3 2.5"` : "";
-  return `<circle r="${R}" fill="${filled ? col : "var(--surface)"}" stroke="${filled ? "var(--surface)" : col}" stroke-width="2"${dash}/>
-    ${p.grade === "own" ? `<circle r="${R + 3.5}" fill="none" stroke="${col}" stroke-width="1.5"/>` : ""}
+  return `<circle r="${r}" fill="${filled ? col : "var(--surface)"}" stroke="${filled ? "var(--surface)" : col}" stroke-width="2"${dash}/>
+    ${p.grade === "own" ? `<circle r="${r + 3.5}" fill="none" stroke="${col}" stroke-width="1.5"/>` : ""}
     ${withLogo ? `<use href="#${m.logo}" x="${-s / 2}" y="${-s / 2}" width="${s}" height="${s}" fill="${filled ? pon(p) : col}"/>` : ""}
-    ${p.via_go ? `<g transform="translate(${R - 2} ${R - 2})"><circle r="5.5" fill="var(--surface)" stroke="var(--p-opencode)" stroke-width="1"/><use href="#logo-opencode" x="-3.5" y="-3.5" width="7" height="7" fill="var(--p-opencode)"/></g>` : ""}`;
+    ${p.via_go ? `<g transform="translate(${r - 2} ${r - 2})"><circle r="5.5" fill="var(--surface)" stroke="var(--p-opencode)" stroke-width="1"/><use href="#logo-opencode" x="-3.5" y="-3.5" width="7" height="7" fill="var(--p-opencode)"/></g>` : ""}`;
 }
 function makerBadge(maker) {
   return `<svg width="20" height="20" viewBox="-10 -10 20 20" aria-hidden="true"><circle r="9.5" fill="${pcol(maker)}"/><use href="#${MAKERS[maker].logo}" x="-6" y="-6" width="12" height="12" fill="${pon(maker)}"/></svg>`;
@@ -84,6 +84,7 @@ const pointBadge = p => `<span style="display:inline-flex;align-items:center;gap
 const gradePill = g => `<span class="grade ${g}">${GRADE_TEXT[g]}</span>`;
 
 // Provider filter chips (makers present in the current benchmark, plus OpenCode Go).
+let pendingChip = null;
 function drawFilters() {
   const makers = Object.keys(MAKERS).filter(m => ALL.some(p => p.maker === m));
   const hasGo = ALL.some(p => p.via_go);
@@ -92,12 +93,18 @@ function drawFilters() {
   const focusChip = fp ? `<button type="button" class="chip" id="focusChip" aria-pressed="true" title="Stop highlighting">${makerBadge(fp.maker)}Highlighting ${esc(fp.family)} · ✕</button>` : "";
   document.getElementById("filters").innerHTML = chip("", "All", "") + makers.map(m => chip(m, m, makerBadge(m))).join("") + (hasGo ? chip("go", "OpenCode Go", goBadge) : "") + focusChip;
   const fc = document.getElementById("focusChip");
-  if (fc) fc.addEventListener("click", () => { focus = ""; workLabel = ""; selectData(); renderAll(); });
+  if (fc) fc.addEventListener("click", () => { focus = ""; workLabel = ""; pendingChip = ""; selectData(); renderAll(); });
   document.querySelectorAll("#filters .chip").forEach(b => b.addEventListener("click", () => {
     filter = filter === b.dataset.f ? "" : b.dataset.f; focus = "";
     store.set("subvalue-filter", filter);
+    pendingChip = filter;
     selectData(); renderAll();
   }));
+  if (pendingChip !== null) {
+    const target = [...document.querySelectorAll("#filters .chip")].find(c => c.dataset.f === pendingChip);
+    pendingChip = null;
+    if (target) target.focus();
+  }
 }
 
 function niceTicks(max) {
@@ -259,7 +266,8 @@ document.querySelectorAll("#yseg button").forEach(b => b.addEventListener("click
 
 function drawChart() {
   const svg = document.getElementById("chart"), kind = scale[1];
-  const W = svg.parentElement.clientWidth - 32, H = W < 560 ? 440 : Math.max(360, Math.min(540, W * 0.68));
+  const W = svg.parentElement.clientWidth - 32, H = W < 560 ? 500 : Math.max(360, Math.min(540, W * 0.68));
+  const rr = W < 560 ? 9 : R;
   if (!P.length) return emptyChart(svg, W, H);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
   svg.setAttribute("aria-label", `Scatter of subscription cost per task against ${yMode === "score" ? "score" : "minutes per task"}, with the ${yMode === "score" ? "quality" : "cost-speed"} frontier`);
@@ -293,7 +301,7 @@ function drawChart() {
     const cls = focus ? (isFocus(p) ? (on ? " focus" : " focus off-f") : " faint") : (!on ? " off" : (onF.has(p) || p === best ? "" : " dim"));
     const name = `${p.label}, ${p.plan}, ${usd(p.per_task)} per task, score ${p.idx}, ${p.mins} minutes${ELIGIBLE(p.grade) ? "" : ", " + GRADE_TEXT[p.grade]}`;
     g += `<g class="pt${cls}" data-i="${P.indexOf(p)}" data-label="${esc(p.label)}" transform="translate(${x} ${y})" tabindex="${on ? 0 : -1}" role="button" aria-label="${esc(name)}">
-      <circle r="14" fill="transparent"/><g transform="scale(${p === best ? 1.25 : 1})">${badge(p, ELIGIBLE(p.grade) || (focus && isFocus(p)) || p === best)}</g></g>`;
+      <circle r="${rr + 4}" fill="transparent"/><g transform="scale(${p === best ? 1.25 : 1})">${badge(p, ELIGIBLE(p.grade) || (focus && isFocus(p)) || p === best, rr)}</g></g>`;
   }
   // Labels: the pick first, then frontier points, skipping any that would overlap.
   const placed = P.filter(p => focus ? isFocus(p) : passes(p)).map(p => [fx(p) - 13, fy(p) - 13, 26, 26]);  // visible badges are obstacles
@@ -303,8 +311,8 @@ function drawChart() {
     : [best, ...[...fr].reverse().filter(p => ELIGIBLE(p.grade))].filter((p, i, a) => p && a.indexOf(p) === i);
   for (const p of want) {
     const x = fx(p), y = fy(p), w = p.label.length * 6.3 + 6, h = 14;
-    const spots = [[x - w / 2, y - R - 22, "middle", x, y - R - 11], [x + 18, y - 7, "start", x + 18, y + 4],
-                   [x - 18 - w, y - 7, "end", x - 18, y + 4], [x - w / 2, y + R + 8, "middle", x, y + R + 19]];
+    const spots = [[x - w / 2, y - rr - 22, "middle", x, y - rr - 11], [x + 18, y - 7, "start", x + 18, y + 4],
+                   [x - 18 - w, y - 7, "end", x - 18, y + 4], [x - w / 2, y + rr + 8, "middle", x, y + rr + 19]];
     const s = spots.find(([x0, y0]) => x0 > m.l && x0 + w < W - m.r && y0 > 2 && fits(x0, y0, w, h));
     if (!s) continue;
     placed.push([s[0], s[1], w, h]);
@@ -397,7 +405,7 @@ function drawTable() {
   const r = ranked(), best = r.find(p => ELIGIBLE(p.grade));
   document.getElementById("tblhead").textContent = `${filter ? (filter === "go" ? "OpenCode Go" : filter) + " points" : "All points"}${minScore !== null || maxCost !== null || maxMins !== null ? " passing the filters" : ""} (${r.length})`;
   document.getElementById("tbl").innerHTML = `<thead><tr><th>Maker</th><th>Model</th><th>Effort</th><th>Plan</th><th>Evidence</th><th class="n">Score</th><th class="n">API $/task</th><th class="n">Tasks/mo</th><th class="n">Sub $/task</th><th class="n">Min/task</th><th>Note</th></tr></thead><tbody>` +
-    r.map(p => `<tr class="${p === best ? "win" : ""}${isFocus(p) ? " hl" : ""}"><td data-label="Maker" style="white-space:nowrap">${pointBadge(p)}</td><td data-label="Model">${esc(p.family)}</td><td data-label="Effort">${esc(p.effort)}</td><td data-label="Plan">${esc(p.plan)}</td><td data-label="Evidence">${gradePill(p.grade)}</td><td data-label="Score" class="n"><b>${p.idx}</b></td><td data-label="API $/task" class="n m-hide">${usd(p.api)}</td><td data-label="Tasks/mo" class="n m-hide">${p.tasks.toLocaleString()}</td><td data-label="Sub $/task" class="n"><b>${usd(p.per_task)}</b></td><td data-label="Min/task" class="n m-hide">${p.mins}</td><td data-label="Note" class="note">${esc(p.note)}</td></tr>`).join("") + "</tbody>";
+    r.map(p => `<tr class="${p === best ? "win" : ""}${isFocus(p) ? " hl" : ""}"><td data-label="Maker" style="white-space:nowrap">${pointBadge(p)}</td><td data-label="Model">${esc(p.family)}</td><td data-label="Effort">${esc(p.effort)}</td><td data-label="Plan">${esc(p.plan)}</td><td data-label="Evidence">${gradePill(p.grade)}</td><td data-label="Score" class="n"><b>${p.idx}</b></td><td data-label="API $/task" class="n">${usd(p.api)}</td><td data-label="Tasks/mo" class="n">${p.tasks.toLocaleString()}</td><td data-label="Sub $/task" class="n"><b>${usd(p.per_task)}</b></td><td data-label="Min/task" class="n">${p.mins}</td><td data-label="Note" class="note">${esc(p.note)}</td></tr>`).join("") + "</tbody>";
 }
 
 // Pareto frontier on cost and time: fastest first, keep a point if it is cheaper than every faster point.

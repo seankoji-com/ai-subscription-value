@@ -375,7 +375,6 @@ footer p { margin: 4px 0; max-width: 80ch; }
   #tbl tr:last-child { border-bottom: 0; }
   #tbl td { border: 0; padding: 1px 0; display: grid; grid-template-columns: 98px minmax(0, 1fr); gap: 10px; font-size: 12.5px; }
   #tbl td::before { content: attr(data-label); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
-  #tbl td.m-hide { display: none; }
   #tbl tr.win { background: var(--accent-soft); }
   #tbl tr.hl { background: color-mix(in srgb, var(--ink) 6%, transparent); }
   .mtable thead { display: none; }
