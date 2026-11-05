@@ -273,10 +273,6 @@ function drawChart() {
   if (!P.length) return emptyChart(svg, W, H);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
   svg.setAttribute("aria-label", `Scatter of subscription cost per task against ${yMode === "score" ? "score" : "minutes per task"}, with the ${yMode === "score" ? "quality" : "cost-speed"} frontier`);
-  const note = document.getElementById("chartNote");
-  if (note) note.innerHTML = measuredOnly
-    ? `<b>Measured only is on.</b> Showing ${P.length} points with measured capacity. Turn it off under Evidence to see all ${ALL.length} estimates.`
-    : `Filled badges are measured; hollow are inferred; dashed are modelled. The shaded band is the frontier among points that pass your filters. Labels mark the frontier and the cheapest measured point; click a point to highlight that model at every effort level.`;
   const m = { l: 56, r: 20, t: 22, b: 44 };
   const xAx = axis(kind, P.map(p => p.per_task), m.l, W - m.r);
   let yAx;
@@ -347,7 +343,7 @@ function drawRec() {
   } else h += `<div class="ins-pick">No measured option${minScore !== null ? " at this score" : ""}</div>`;
   h += `<div class="ins-block"><b>${yMode === "score" ? "Quality frontier" : "Cost–speed frontier"}</b> <span class="meta">(${yMode === "score" ? "highest score first" : "fastest first"})</span><ol class="rank">${fr.map(p => `<li><span>${esc(p.label)} <span class="meta">(${p.idx}, ${p.mins} min${ELIGIBLE(p.grade) ? "" : ", " + GRADE_TEXT[p.grade]})</span></span><span>${usd(p.per_task)}</span></li>`).join("")}</ol></div>`;
   h += `<div class="ins-block"><b>Measured, cheapest first</b><ol class="rank">${eligible.slice(0, 8).map(p => `<li><span>${esc(p.label)} <span class="meta">(${p.idx})</span></span><span>${usd(p.per_task)}</span></li>`).join("") || "<li><span>None</span></li>"}</ol></div>`;
-  h += `<div class="ins-block">${r.length} of ${ALL.length} points pass the filters. Only measured points are recommended.</div>`;
+  h += `<div class="ins-block">${r.length} of ${ALL.length} points pass the filters.</div>`;
   document.getElementById("rec").innerHTML = h;
 }
 
@@ -371,7 +367,6 @@ function drawVerdict() {
       <div class="vstat"><b>${best.mins} min</b><span>per task</span></div>
     </div>
     <p class="vwhy">${esc(why)}</p>
-    <p class="vassume">Assumes 100% of the plan's weekly cap is used.</p>
     <a class="vcta" href="#explore">See how it compares ↓</a>`;
 }
 
@@ -379,11 +374,14 @@ function drawGlance() {
   const measured = ALL.filter(p => ELIGIBLE(p.grade));
   const cheapest = [...measured].sort((a, b) => a.per_task - b.per_task)[0];
   const fastest = [...measured].sort((a, b) => a.mins - b.mins)[0];
+  if (!cheapest || !fastest) {
+    document.getElementById("glance").innerHTML = `<div class="glance-head">At a glance</div><div class="glance-row"><span class="glabel">Measured</span><span class="gval">None</span></div>`;
+    return;
+  }
   const rows = [
     ["Work per $100", `${Math.round(100 / cheapest.per_task)} tasks`, `${cheapest.label} on ${cheapest.plan}`],
     ["Fastest measured", `${fastest.mins} min/task`, `${fastest.label} · ${usd(fastest.per_task)}/task · score ${fastest.idx}`],
     ["Plans compared", `${Object.keys(DATA.plans).length} plans`, "Top plan from each provider; OpenCode Go covers DeepSeek and Kimi."],
-    ["Measured coverage", `${measured.length} of ${ALL.length} points`, "The rest are inferred or modelled and never recommended."],
   ];
   document.getElementById("glance").innerHTML = `<div class="glance-head">At a glance</div>` + rows.map(([label, val, sub]) =>
     `<div class="glance-row"><span class="glabel">${esc(label)}</span><span class="gval">${esc(val)}</span><span class="gsub">${esc(sub)}</span></div>`).join("")
@@ -392,7 +390,7 @@ function drawGlance() {
 
 let barsFloor = store.get("subvalue-bars-floor") || "measured";
 let pendingFloor = null;
-const FLOORS = [["measured", "Measured"], ["40", "40+"], ["50", "50+"], ["55", "55+"], ["60", "60+"]];
+const FLOORS = [["measured", "Measured"], ["40", "40"], ["50", "50"], ["60", "60"]];
 if (!FLOORS.some(([v]) => v === barsFloor)) barsFloor = "measured";
 
 function drawValueBars() {
@@ -408,28 +406,28 @@ function drawValueBars() {
   const rows = [...withBest, ...empty];
   const maxWork = Math.max(...withBest.map(r => 1 / r.best.per_task), 1);
   const bars = rows.map(({ pl, best }) => {
+    const planBadge = MAKERS[pl.provider] ? makerBadge(pl.provider) : goBadge;
     if (!best) return `<div class="vb-row empty">
-        <div class="vb-name">${esc(pl.provider)}<span class="vb-plan">${esc(pl.plan)}</span></div>
+        <div class="vb-name">${planBadge} ${esc(pl.provider)}<span class="vb-plan">${esc(pl.plan)}</span></div>
         <div class="vb-track" aria-hidden="true"></div>
         <div class="vb-val"><b>—</b><span>${barsFloor === "measured" ? "No measured point" : `No point ≥ ${barsFloor}`}</span></div>
       </div>`;
-    const name = best.via_go ? `${esc(best.maker)} · via Go` : esc(pl.provider);
+    const bestBadge = MAKERS[best.maker] ? makerBadge(best.maker) : goBadge;
+    const col = MAKERS[best.maker] ? pcol(best.maker) : "var(--p-opencode)";
+    const name = esc(best.maker || pl.provider);
     return `<div class="vb-row">
-        <div class="vb-name">${name} ${gradePill(best.grade)}<span class="vb-plan">${esc(pl.plan)} · ${esc(best.label)}</span></div>
-        <div class="vb-track" aria-hidden="true"><div class="vb-fill ${best.grade}" style="width:${Math.max(6, (1 / best.per_task) / maxWork * 100).toFixed(1)}%"></div></div>
+        <div class="vb-name">${bestBadge} ${name} ${gradePill(best.grade)}<span class="vb-plan">${esc(pl.plan)} · ${esc(best.label)}${best.via_go ? " · via Go" : ""}</span></div>
+        <div class="vb-track" aria-hidden="true"><div class="vb-fill ${best.grade}" style="--bar:${col};width:${Math.max(6, (1 / best.per_task) / maxWork * 100).toFixed(1)}%"></div></div>
         <div class="vb-val"><b>${Math.round(100 / best.per_task)} tasks</b><span>${usd(best.per_task)}/task<br>score ${best.idx}</span></div>
       </div>`;
   }).join("");
   const seg = FLOORS.map(([v, label]) => `<button type="button" data-floor="${v}" aria-pressed="${String(barsFloor === v)}">${label}</button>`).join("");
   document.getElementById("valuebars").innerHTML = `
     <div class="vb-head">
-      <div><h3>Tasks per $100 of plan</h3><span class="vb-sub">${barsFloor === "measured" ? "Cheapest measured point on each plan · longer is better" : `Cheapest point scoring ≥ ${barsFloor} · estimates included`}</span></div>
+      <div><h3>Tasks per $100 of plan</h3><span class="vb-sub">${barsFloor === "measured" ? "Cheapest measured point on each plan · longer is better" : `Cheapest point scoring ≥ ${barsFloor}`}</span></div>
       <div class="seg vb-seg" role="group" aria-label="Value floor">${seg}</div>
     </div>
-    ${bars}
-    <p class="vb-note">${barsFloor === "measured"
-      ? "Only measured points are recommended. Switch the floor to 40+ to see each plan's cheapest point including estimates; grades are shown beside every model."
-      : `Estimates are included at the ${barsFloor}+ floor. Bar patterns show the grade: solid measured, striped inferred, dashed modelled. Only measured points are recommendations; a plan can look cheaper because its capacity or benchmark row is estimated.`}</p>`;
+    ${bars}`;
   if (pendingFloor) {
     const el = document.querySelector(`#valuebars [data-floor="${pendingFloor}"]`);
     pendingFloor = null;
