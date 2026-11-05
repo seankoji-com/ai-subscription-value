@@ -387,3 +387,12 @@ footer p { margin: 4px 0; max-width: 80ch; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) svg .pt.dim { opacity: .58; }
+  :root:not([data-theme="light"]) svg .pt.off { opacity: .28; }
+  :root:not([data-theme="light"]) svg .pt.faint { opacity: .14; }
+}
+:root[data-theme="dark"] svg .pt.dim { opacity: .58; }
+:root[data-theme="dark"] svg .pt.off { opacity: .28; }
+:root[data-theme="dark"] svg .pt.faint { opacity: .14; }

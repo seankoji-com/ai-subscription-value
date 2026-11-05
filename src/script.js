@@ -44,6 +44,7 @@ let bench = BENCHES.includes(params.get("bench")) ? params.get("bench") : (BENCH
 // Filter: a maker name, "go" for everything served through OpenCode Go, or "" for all.
 let filter = params.has("provider") ? params.get("provider") : (store.get("subvalue-filter") || "");
 let measuredOnly = store.get("subvalue-measured") === "1";
+if (store.get("subvalue-measured") === null && matchMedia("(max-width: 560px)").matches) measuredOnly = true;
 let B, P, ALL;
 // Focus: tapping a point shows only that model (same plan and family) at every effort level.
 let focus = params.get("focus") || "";
@@ -68,7 +69,7 @@ if (qScale === "log" || qScale === "linear") scale[1] = scale[2] = qScale;
 
 
 // Badge: maker logo in a round badge. Measured: filled. Inferred: hollow ring. Modelled: dashed ring.
-const R = 11;
+const R = 10;
 function badge(p, withLogo = true, r = R) {
   const m = MAKERS[p.maker], s = 14, col = pcol(p), filled = ELIGIBLE(p.grade), dash = p.grade === "modelled" ? ` stroke-dasharray="3 2.5"` : "";
   return `<circle r="${r}" fill="${filled ? col : "var(--surface)"}" stroke="${filled ? "var(--surface)" : col}" stroke-width="2"${dash}/>
@@ -93,8 +94,9 @@ function drawFilters() {
   const focusChip = fp ? `<button type="button" class="chip" id="focusChip" aria-pressed="true" title="Stop highlighting">${makerBadge(fp.maker)}Highlighting ${esc(fp.family)} · ✕</button>` : "";
   document.getElementById("filters").innerHTML = chip("", "All", "") + makers.map(m => chip(m, m, makerBadge(m))).join("") + (hasGo ? chip("go", "OpenCode Go", goBadge) : "") + focusChip;
   const fc = document.getElementById("focusChip");
-  if (fc) fc.addEventListener("click", () => { focus = ""; workLabel = ""; pendingChip = ""; selectData(); renderAll(); });
+  if (fc) fc.addEventListener("click", () => { const keepFilter = filter; focus = ""; workLabel = ""; pendingChip = keepFilter; selectData(); renderAll(); });
   document.querySelectorAll("#filters .chip").forEach(b => b.addEventListener("click", () => {
+    if (b.id === "focusChip") return;
     filter = filter === b.dataset.f ? "" : b.dataset.f; focus = "";
     store.set("subvalue-filter", filter);
     pendingChip = filter;
@@ -271,6 +273,10 @@ function drawChart() {
   if (!P.length) return emptyChart(svg, W, H);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
   svg.setAttribute("aria-label", `Scatter of subscription cost per task against ${yMode === "score" ? "score" : "minutes per task"}, with the ${yMode === "score" ? "quality" : "cost-speed"} frontier`);
+  const note = document.getElementById("chartNote");
+  if (note) note.innerHTML = measuredOnly
+    ? `<b>Measured only is on.</b> Showing ${P.length} points with measured capacity. Turn it off under Evidence to see all ${ALL.length} estimates.`
+    : `Filled badges are measured; hollow are inferred; dashed are modelled. The shaded band is the frontier among points that pass your filters. Labels mark the frontier and the cheapest measured point; click a point to highlight that model at every effort level.`;
   const m = { l: 56, r: 20, t: 22, b: 44 };
   const xAx = axis(kind, P.map(p => p.per_task), m.l, W - m.r);
   let yAx;
@@ -308,6 +314,7 @@ function drawChart() {
   const fits = (x0, y0, w, h) => !placed.some(b => x0 < b[0] + b[2] && b[0] < x0 + w && y0 < b[1] + b[3] && b[1] < y0 + h);
   // While a model is highlighted, label only its effort levels.
   const want = focus ? P.filter(isFocus).sort((a, b) => EFFORT_ORDER.indexOf(b.effort) - EFFORT_ORDER.indexOf(a.effort))
+    : measuredOnly ? [...P]
     : [best, ...[...fr].reverse().filter(p => ELIGIBLE(p.grade))].filter((p, i, a) => p && a.indexOf(p) === i);
   for (const p of want) {
     const x = fx(p), y = fy(p), w = p.label.length * 6.3 + 6, h = 14;
