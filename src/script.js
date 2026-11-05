@@ -378,7 +378,6 @@ function drawGlance() {
     ["Work per $100", `${Math.round(100 / cheapest.per_task)} tasks`, `${cheapest.label} on ${cheapest.plan}`],
     ["Fastest measured", `${fastest.mins} min/task`, `${fastest.label} · ${usd(fastest.per_task)}/task · score ${fastest.idx}`],
     ["Plans compared", `${Object.keys(DATA.plans).length} plans`, "Top plan from each provider; OpenCode Go covers DeepSeek and Kimi."],
-    ["Measured coverage", `${measured.length} of ${ALL.length} points`, "Points with measured capacity."],
   ];
   document.getElementById("glance").innerHTML = `<div class="glance-head">At a glance</div>` + rows.map(([label, val, sub]) =>
     `<div class="glance-row"><span class="glabel">${esc(label)}</span><span class="gval">${esc(val)}</span><span class="gsub">${esc(sub)}</span></div>`).join("")
