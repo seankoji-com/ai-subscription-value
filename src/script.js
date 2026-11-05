@@ -187,7 +187,10 @@ const drawLegend = () => document.getElementById("legend").innerHTML = gradeLege
 
 function emptyChart(svg, W, H) {
   svg.setAttribute("width", W); svg.setAttribute("height", 120);
-  svg.innerHTML = `<text x="${W / 2}" y="60" text-anchor="middle">No points for this provider in this benchmark</text>`;
+  const lines = measuredOnly
+    ? ["No measured points for this filter.", "Turn off Measured only to see estimates."]
+    : ["No points for this provider in this benchmark"];
+  svg.innerHTML = lines.map((line, i) => `<text x="${W / 2}" y="${52 + i * 18}" text-anchor="middle">${esc(line)}</text>`).join("");
 }
 
 // ---- Chart 1: score against subscription cost per task, with the quality frontier ----
@@ -256,7 +259,7 @@ document.querySelectorAll("#yseg button").forEach(b => b.addEventListener("click
 
 function drawChart() {
   const svg = document.getElementById("chart"), kind = scale[1];
-  const W = svg.parentElement.clientWidth - 32, H = Math.max(360, Math.min(540, W * 0.68));
+  const W = svg.parentElement.clientWidth - 32, H = W < 560 ? 440 : Math.max(360, Math.min(540, W * 0.68));
   if (!P.length) return emptyChart(svg, W, H);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
   svg.setAttribute("aria-label", `Scatter of subscription cost per task against ${yMode === "score" ? "score" : "minutes per task"}, with the ${yMode === "score" ? "quality" : "cost-speed"} frontier`);
@@ -394,7 +397,7 @@ function drawTable() {
   const r = ranked(), best = r.find(p => ELIGIBLE(p.grade));
   document.getElementById("tblhead").textContent = `${filter ? (filter === "go" ? "OpenCode Go" : filter) + " points" : "All points"}${minScore !== null || maxCost !== null || maxMins !== null ? " passing the filters" : ""} (${r.length})`;
   document.getElementById("tbl").innerHTML = `<thead><tr><th>Maker</th><th>Model</th><th>Effort</th><th>Plan</th><th>Evidence</th><th class="n">Score</th><th class="n">API $/task</th><th class="n">Tasks/mo</th><th class="n">Sub $/task</th><th class="n">Min/task</th><th>Note</th></tr></thead><tbody>` +
-    r.map(p => `<tr class="${p === best ? "win" : ""}${isFocus(p) ? " hl" : ""}"><td style="white-space:nowrap">${pointBadge(p)}</td><td>${esc(p.family)}</td><td>${esc(p.effort)}</td><td>${esc(p.plan)}</td><td>${gradePill(p.grade)}</td><td class="n"><b>${p.idx}</b></td><td class="n">${usd(p.api)}</td><td class="n">${p.tasks.toLocaleString()}</td><td class="n"><b>${usd(p.per_task)}</b></td><td class="n">${p.mins}</td><td class="note">${esc(p.note)}</td></tr>`).join("") + "</tbody>";
+    r.map(p => `<tr class="${p === best ? "win" : ""}${isFocus(p) ? " hl" : ""}"><td data-label="Maker" style="white-space:nowrap">${pointBadge(p)}</td><td data-label="Model">${esc(p.family)}</td><td data-label="Effort">${esc(p.effort)}</td><td data-label="Plan">${esc(p.plan)}</td><td data-label="Evidence">${gradePill(p.grade)}</td><td data-label="Score" class="n"><b>${p.idx}</b></td><td data-label="API $/task" class="n m-hide">${usd(p.api)}</td><td data-label="Tasks/mo" class="n m-hide">${p.tasks.toLocaleString()}</td><td data-label="Sub $/task" class="n"><b>${usd(p.per_task)}</b></td><td data-label="Min/task" class="n m-hide">${p.mins}</td><td data-label="Note" class="note">${esc(p.note)}</td></tr>`).join("") + "</tbody>";
 }
 
 // Pareto frontier on cost and time: fastest first, keep a point if it is cheaper than every faster point.

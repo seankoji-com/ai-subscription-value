@@ -97,7 +97,7 @@ button { font: inherit; }
 }
 
 /* Hero */
-.hero { padding: 60px 0 26px; }
+.hero { padding-top: 60px; padding-bottom: 26px; }
 .eyebrow {
   display: flex; align-items: center; gap: 10px; margin: 0;
   font: 700 11px/1 var(--sans); letter-spacing: .15em; text-transform: uppercase; color: var(--accent);
@@ -239,8 +239,8 @@ svg text { fill: var(--muted); font-size: 11px; font-family: var(--sans); }
 svg .lbl { fill: var(--ink-2); font-size: 11.5px; }
 svg .lbl.win { fill: var(--ink); font-weight: 600; }
 svg .pt { transition: opacity 180ms ease; cursor: pointer; }
-svg .pt.off { opacity: .14; }
-svg .pt.dim { opacity: .38; }
+svg .pt.off { opacity: .18; }
+svg .pt.dim { opacity: .42; }
 svg .pt.faint { opacity: .1; }
 svg .pt.focus.off-f { opacity: .55; }
 svg .pt:hover, svg .pt:focus { opacity: 1; }
@@ -351,7 +351,7 @@ footer p { margin: 4px 0; max-width: 80ch; }
   .masthead nav::-webkit-scrollbar { display: none; }
   .masthead nav a { font-size: 11.5px; white-space: nowrap; }
   .theme-btn { flex: none; }
-  .hero { padding: 42px 0 18px; }
+  .hero { padding-top: 42px; padding-bottom: 18px; }
   h1 { font-size: clamp(34px, 10.5vw, 46px); max-width: 13ch; }
   .standfirst { font-size: 16px; }
   .hero-grid { margin-top: 26px; gap: 12px; }
@@ -370,9 +370,15 @@ footer p { margin: 4px 0; max-width: 80ch; }
   .disclosure > summary { padding: 15px 16px; }
   .disclosure .body { padding: 2px 16px 18px; }
   .tablewrap { max-height: 64vh; }
-  #tbl th:first-child, #tbl td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 1px 0 0 var(--line); }
-  #tbl tr.win td:first-child { background: var(--accent-soft); }
-  #tbl tr.hl td:first-child { background: color-mix(in srgb, var(--ink) 6%, var(--surface)); }
+  #tbl thead { display: none; }
+  #tbl, #tbl tbody, #tbl tr, #tbl td { display: block; width: auto; }
+  #tbl tr { padding: 12px 2px; border-bottom: 1px solid var(--line); }
+  #tbl tr:last-child { border-bottom: 0; }
+  #tbl td { border: 0; padding: 1px 0; display: grid; grid-template-columns: 98px minmax(0, 1fr); gap: 10px; font-size: 12.5px; }
+  #tbl td::before { content: attr(data-label); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+  #tbl td.m-hide { display: none; }
+  #tbl tr.win { background: var(--accent-soft); }
+  #tbl tr.hl { background: color-mix(in srgb, var(--ink) 6%, transparent); }
   .mtable thead { display: none; }
   .mtable tr, .mtable td { display: block; width: auto !important; }
   .mtable td:first-child { font-weight: 600; padding-top: 10px; width: auto; }
