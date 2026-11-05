@@ -19,14 +19,36 @@ const store = {
 };
 const params = new URLSearchParams(location.search);
 
+// Theme: follow the system by default, with an explicit two-state toggle.
+const themeBtn = document.getElementById("themeBtn");
+function setTheme(t) {
+  if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+  store.set("subvalue-theme", t || "");
+  const effective = t || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  themeBtn.setAttribute("aria-label", effective === "dark" ? "Switch to light theme" : "Switch to dark theme");
+  themeBtn.setAttribute("title", themeBtn.getAttribute("aria-label"));
+}
+const savedTheme = store.get("subvalue-theme");
+if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
+else setTheme("");
+themeBtn.addEventListener("click", () => {
+  const dark = document.documentElement.dataset.theme === "dark"
+    || (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  setTheme(dark ? "light" : "dark");
+});
+
 const capMode = "public";  // public capacity sources only
 const BENCHES = ["coding"];
 let bench = BENCHES.includes(params.get("bench")) ? params.get("bench") : (BENCHES.includes(store.get("subvalue-bench-v3")) ? store.get("subvalue-bench-v3") : "coding");
 // Filter: a maker name, "go" for everything served through OpenCode Go, or "" for all.
 let filter = params.has("provider") ? params.get("provider") : (store.get("subvalue-filter") || "");
+let measuredOnly = store.get("subvalue-measured") === "1";
+if (store.get("subvalue-measured") === null && matchMedia("(max-width: 560px)").matches) measuredOnly = true;
 let B, P, ALL;
 // Focus: tapping a point shows only that model (same plan and family) at every effort level.
 let focus = params.get("focus") || "";
+let pendingFocus = "";
 const famKey = p => p.plan + "|" + p.family;
 const inFilter = p => !filter || (filter === "go" ? p.via_go : p.maker === filter);
 const isFocus = p => !!focus && famKey(p) === focus;
@@ -34,9 +56,11 @@ function selectData() {
   B = DATA.benchmarks[bench]; ALL = B.modes[capMode];
   if (filter && !ALL.some(inFilter)) filter = "";
   if (focus && !ALL.some(p => famKey(p) === focus && inFilter(p))) focus = "";
-  P = ALL.filter(inFilter);
+  P = measuredOnly ? ALL.filter(inFilter).filter(p => ELIGIBLE(p.grade)) : ALL.filter(inFilter);
   document.getElementById("benchabout").innerHTML = `<b>${esc(B.long)}.</b> ${esc(B.about)} Score: ${esc(B.score)}. <a href="${esc(B.url)}">Source</a>.`;
   document.querySelectorAll("#benchseg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.bench === bench)));
+  const mt = document.getElementById("measuredToggle");
+  if (mt) mt.setAttribute("aria-pressed", String(measuredOnly));
   drawFilters();
 }
 const scale = { 1: store.get("subvalue-scale1") === "linear" ? "linear" : "log", 2: store.get("subvalue-scale2") === "linear" ? "linear" : "log" };
@@ -45,13 +69,13 @@ if (qScale === "log" || qScale === "linear") scale[1] = scale[2] = qScale;
 
 
 // Badge: maker logo in a round badge. Measured: filled. Inferred: hollow ring. Modelled: dashed ring.
-const R = 11;
-function badge(p) {
+const R = 10;
+function badge(p, withLogo = true, r = R) {
   const m = MAKERS[p.maker], s = 14, col = pcol(p), filled = ELIGIBLE(p.grade), dash = p.grade === "modelled" ? ` stroke-dasharray="3 2.5"` : "";
-  return `<circle r="${R}" fill="${filled ? col : "var(--surface)"}" stroke="${filled ? "var(--surface)" : col}" stroke-width="2"${dash}/>
-    ${p.grade === "own" ? `<circle r="${R + 3.5}" fill="none" stroke="${col}" stroke-width="1.5"/>` : ""}
-    <use href="#${m.logo}" x="${-s / 2}" y="${-s / 2}" width="${s}" height="${s}" fill="${filled ? pon(p) : col}"/>
-    ${p.via_go ? `<g transform="translate(${R - 2} ${R - 2})"><circle r="5.5" fill="var(--surface)" stroke="var(--p-opencode)" stroke-width="1"/><use href="#logo-opencode" x="-3.5" y="-3.5" width="7" height="7" fill="var(--p-opencode)"/></g>` : ""}`;
+  return `<circle r="${r}" fill="${filled ? col : "var(--surface)"}" stroke="${filled ? "var(--surface)" : col}" stroke-width="2"${dash}/>
+    ${p.grade === "own" ? `<circle r="${r + 3.5}" fill="none" stroke="${col}" stroke-width="1.5"/>` : ""}
+    ${withLogo ? `<use href="#${m.logo}" x="${-s / 2}" y="${-s / 2}" width="${s}" height="${s}" fill="${filled ? pon(p) : col}"/>` : ""}
+    ${p.via_go ? `<g transform="translate(${r - 2} ${r - 2})"><circle r="5.5" fill="var(--surface)" stroke="var(--p-opencode)" stroke-width="1"/><use href="#logo-opencode" x="-3.5" y="-3.5" width="7" height="7" fill="var(--p-opencode)"/></g>` : ""}`;
 }
 function makerBadge(maker) {
   return `<svg width="20" height="20" viewBox="-10 -10 20 20" aria-hidden="true"><circle r="9.5" fill="${pcol(maker)}"/><use href="#${MAKERS[maker].logo}" x="-6" y="-6" width="12" height="12" fill="${pon(maker)}"/></svg>`;
@@ -61,6 +85,7 @@ const pointBadge = p => `<span style="display:inline-flex;align-items:center;gap
 const gradePill = g => `<span class="grade ${g}">${GRADE_TEXT[g]}</span>`;
 
 // Provider filter chips (makers present in the current benchmark, plus OpenCode Go).
+let pendingChip = null;
 function drawFilters() {
   const makers = Object.keys(MAKERS).filter(m => ALL.some(p => p.maker === m));
   const hasGo = ALL.some(p => p.via_go);
@@ -69,12 +94,19 @@ function drawFilters() {
   const focusChip = fp ? `<button type="button" class="chip" id="focusChip" aria-pressed="true" title="Stop highlighting">${makerBadge(fp.maker)}Highlighting ${esc(fp.family)} · ✕</button>` : "";
   document.getElementById("filters").innerHTML = chip("", "All", "") + makers.map(m => chip(m, m, makerBadge(m))).join("") + (hasGo ? chip("go", "OpenCode Go", goBadge) : "") + focusChip;
   const fc = document.getElementById("focusChip");
-  if (fc) fc.addEventListener("click", () => { focus = ""; workLabel = ""; selectData(); renderAll(); });
+  if (fc) fc.addEventListener("click", () => { const keepFilter = filter; focus = ""; workLabel = ""; pendingChip = keepFilter; selectData(); renderAll(); });
   document.querySelectorAll("#filters .chip").forEach(b => b.addEventListener("click", () => {
+    if (b.id === "focusChip") return;
     filter = filter === b.dataset.f ? "" : b.dataset.f; focus = "";
     store.set("subvalue-filter", filter);
+    pendingChip = filter;
     selectData(); renderAll();
   }));
+  if (pendingChip !== null) {
+    const target = [...document.querySelectorAll("#filters .chip")].find(c => c.dataset.f === pendingChip);
+    pendingChip = null;
+    if (target) target.focus();
+  }
 }
 
 function niceTicks(max) {
@@ -103,9 +135,12 @@ function axis(kind, values, a, b) {
 const fmtTick = (v, money) => money ? "$" + (v >= 1 || v === 0 ? v : +v.toPrecision(2)) : String(v);
 
 function frame(kind, xAx, yAx, m, W, H, xTitle, yTitle, xMoney = false, yMoney = true) {
+  const thin = (ticks, f, minGap) => { let last = null; return ticks.filter(v => { const p = f(v); if (last === null || Math.abs(p - last) >= minGap) { last = p; return true; } return false; }); };
+  const xTicks = W < 560 ? thin(xAx.ticks, xAx.f, 58) : xAx.ticks;
+  const yTicks = H < 430 ? thin(yAx.ticks, yAx.f, 26) : yAx.ticks;
   let g = "";
-  for (const v of xAx.ticks) g += `<line x1="${xAx.f(v)}" x2="${xAx.f(v)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--grid)"/><text x="${xAx.f(v)}" y="${H - m.b + 16}" text-anchor="middle">${fmtTick(v, xMoney)}</text>`;
-  for (const v of yAx.ticks) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${yAx.f(v)}" y2="${yAx.f(v)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${yAx.f(v) + 4}" text-anchor="end">${fmtTick(v, yMoney)}</text>`;
+  for (const v of xTicks) g += `<line x1="${xAx.f(v)}" x2="${xAx.f(v)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--grid)"/><text x="${xAx.f(v)}" y="${H - m.b + 16}" text-anchor="middle">${fmtTick(v, xMoney)}</text>`;
+  for (const v of yTicks) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${yAx.f(v)}" y2="${yAx.f(v)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${yAx.f(v) + 4}" text-anchor="end">${fmtTick(v, yMoney)}</text>`;
   g += `<line x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}" stroke="var(--axis)"/>`;
   g += `<text x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">${xTitle} (${kind})</text>`;
   g += `<text transform="translate(14 ${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle">${yTitle} (${kind})</text>`;
@@ -120,7 +155,7 @@ function familyLines(pts, fx, fy, hl = "") {
   for (const arr of Object.values(fam)) {
     if (arr.length < 2) continue;
     arr.sort((a, b) => EFFORT_ORDER.indexOf(a.effort) - EFFORT_ORDER.indexOf(b.effort));
-    g += `<polyline points="${arr.map(p => `${fx(p)},${fy(p)}`).join(" ")}" fill="none" stroke="${pcol(arr[0])}" stroke-width="${hl && famKey(arr[0]) === hl ? 2.5 : 1.5}" stroke-linejoin="round" opacity="${!hl ? 0.35 : famKey(arr[0]) === hl ? 0.9 : 0.08}"/>`;
+    g += `<polyline points="${arr.map(p => `${fx(p)},${fy(p)}`).join(" ")}" fill="none" stroke="${pcol(arr[0])}" stroke-width="${hl && famKey(arr[0]) === hl ? 2.5 : 1.25}" stroke-linejoin="round" opacity="${!hl ? 0.26 : famKey(arr[0]) === hl ? 0.9 : 0.08}"/>`;
   }
   return g;
 }
@@ -136,7 +171,7 @@ function wireTips(svg, tip, html) {
   const hide = () => tip.style.display = "none";
   svg.querySelectorAll(".pt").forEach(el => {
     el.addEventListener("mouseenter", () => show(el)); el.addEventListener("focus", () => show(el));
-    el.addEventListener("click", () => { const p = P[+el.dataset.i]; const same = workLabel === p.label; focus = same ? "" : famKey(p); workLabel = same ? "" : p.label; hide(); selectData(); renderAll(); });
+    el.addEventListener("click", () => { const p = P[+el.dataset.i]; const same = workLabel === p.label; focus = same ? "" : famKey(p); workLabel = same ? "" : p.label; pendingFocus = p.label; hide(); selectData(); renderAll(); });
     el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.dispatchEvent(new Event("click")); } });
     el.addEventListener("mouseleave", hide); el.addEventListener("blur", hide);
   });
@@ -152,16 +187,19 @@ const tipHtml = p => `<b>${esc(p.label)}</b> ${gradePill(p.grade)}
   <div>${p.tasks.toLocaleString()} tasks/mo at full cap · API ${usd(p.api)}/task</div>
   <div style="margin-top:4px">${esc(p.note)}</div>`;
 
-const gradeLegend = `<span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="6" fill="var(--ink2)"/></svg>Measured</span>
-  <span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5.5" fill="none" stroke="var(--ink2)" stroke-width="1.5"/></svg>Inferred</span>
-  <span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5.5" fill="none" stroke="var(--ink2)" stroke-width="1.5" stroke-dasharray="3 2.5"/></svg>Modelled</span>
-  <span>${goBadge.replace('width="20" height="20"', 'width="14" height="14"')}Served via OpenCode Go</span>
-  <span><svg width="26" height="10"><line x1="1" x2="25" y1="5" y2="5" stroke="var(--p-claude)" stroke-width="1.5" opacity="0.45"/></svg>Effort levels of one model</span>`;
-const drawLegend = () => document.getElementById("legend").innerHTML = gradeLegend + `<span><svg width="26" height="14"><line x1="4" x2="22" y1="7" y2="7" stroke="var(--ink)" stroke-opacity="0.12" stroke-width="10" stroke-linecap="round"/></svg>${yMode === "score" ? "Quality frontier" : "Cost–speed frontier"}</span><span><svg width="34" height="14" viewBox="0 0 34 14"><circle cx="7" cy="7" r="6" fill="var(--ink2)"/><circle cx="25" cy="7" r="6" fill="var(--ink2)" opacity="0.3"/></svg>${yMode === "score" ? "On the frontier / something cheaper scores as well" : "On the frontier / beaten on cost and time"}</span><span><b style="color:var(--ink)">Bold label</b>&nbsp;cheapest measured</span>`;
+const gradeLegend = `<span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="6" fill="var(--ink-2)"/></svg>Measured</span>
+  <span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5.5" fill="none" stroke="var(--ink-2)" stroke-width="1.5"/></svg>Inferred</span>
+  <span><svg width="14" height="14" viewBox="-7 -7 14 14"><circle r="5.5" fill="none" stroke="var(--ink-2)" stroke-width="1.5" stroke-dasharray="3 2.5"/></svg>Modelled</span>
+  <span class="legend-extra">${goBadge.replace('width="20" height="20"', 'width="14" height="14"')}Served via OpenCode Go</span>
+  <span class="legend-extra"><svg width="26" height="10"><line x1="1" x2="25" y1="5" y2="5" stroke="var(--p-claude)" stroke-width="1.5" opacity="0.45"/></svg>Effort levels of one model</span>`;
+const drawLegend = () => document.getElementById("legend").innerHTML = gradeLegend + `<span><svg width="26" height="14"><line x1="4" x2="22" y1="7" y2="7" stroke="var(--ink)" stroke-opacity="0.12" stroke-width="10" stroke-linecap="round"/></svg>${yMode === "score" ? "Quality frontier" : "Cost–speed frontier"}</span><span class="legend-extra"><svg width="34" height="14" viewBox="0 0 34 14"><circle cx="7" cy="7" r="6" fill="var(--ink-2)"/><circle cx="25" cy="7" r="6" fill="var(--ink-2)" opacity="0.3"/></svg>${yMode === "score" ? "On the frontier / something cheaper scores as well" : "On the frontier / beaten on cost and time"}</span><span><b style="color:var(--ink)">Bold label</b>&nbsp;cheapest measured</span>`;
 
 function emptyChart(svg, W, H) {
   svg.setAttribute("width", W); svg.setAttribute("height", 120);
-  svg.innerHTML = `<text x="${W / 2}" y="60" text-anchor="middle">No points for this provider in this benchmark</text>`;
+  const lines = measuredOnly
+    ? ["No measured points for this filter.", "Turn off Measured only to see estimates."]
+    : ["No points for this provider in this benchmark"];
+  svg.innerHTML = lines.map((line, i) => `<text x="${W / 2}" y="${52 + i * 18}" text-anchor="middle">${esc(line)}</text>`).join("");
 }
 
 // ---- Chart 1: score against subscription cost per task, with the quality frontier ----
@@ -230,9 +268,15 @@ document.querySelectorAll("#yseg button").forEach(b => b.addEventListener("click
 
 function drawChart() {
   const svg = document.getElementById("chart"), kind = scale[1];
-  const W = svg.parentElement.clientWidth - 32, H = Math.max(360, Math.min(540, W * 0.68));
+  const W = svg.parentElement.clientWidth - 32, H = W < 560 ? 500 : Math.max(360, Math.min(540, W * 0.68));
+  const rr = W < 560 ? 9 : R;
   if (!P.length) return emptyChart(svg, W, H);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("aria-label", `Scatter of subscription cost per task against ${yMode === "score" ? "score" : "minutes per task"}, with the ${yMode === "score" ? "quality" : "cost-speed"} frontier`);
+  const note = document.getElementById("chartNote");
+  if (note) note.innerHTML = measuredOnly
+    ? `<b>Measured only is on.</b> Showing ${P.length} points with measured capacity. Turn it off under Evidence to see all ${ALL.length} estimates.`
+    : `Filled badges are measured; hollow are inferred; dashed are modelled. The shaded band is the frontier among points that pass your filters. Labels mark the frontier and the cheapest measured point; click a point to highlight that model at every effort level.`;
   const m = { l: 56, r: 20, t: 22, b: 44 };
   const xAx = axis(kind, P.map(p => p.per_task), m.l, W - m.r);
   let yAx;
@@ -247,7 +291,7 @@ function drawChart() {
   let g = frame(yMode === "score" ? kind : kind, xAx, yAx, m, W, H, `Subscription $ per ${B.task}`,
                 yMode === "score" ? B.score : `Minutes per ${B.task}`, true, false);
   if (yMode === "score") g = g.replace(`${esc(B.score)} (${kind})`, esc(B.score));
-  g += familyLines(P.filter(p => passes(p) || isFocus(p)), fx, fy, focus);  // connect effort levels that pass the filters (and the highlighted model)
+  g += familyLines(P.filter(p => (passes(p) || isFocus(p)) && (ELIGIBLE(p.grade) || (focus && famKey(p) === focus))), fx, fy, focus);  // lines for measured families and the highlighted model
   // Frontier among points that pass the filters. Time: nothing else is both cheaper and faster.
   // Score: nothing cheaper scores higher.
   const fr = (yMode === "score" ? qualityFrontier : frontierOf)(P.filter(passes)), onF = new Set(fr);
@@ -261,25 +305,32 @@ function drawChart() {
   for (const p of [...P].sort((a, b) => rank(a) - rank(b))) {
     const x = fx(p), y = fy(p), on = passes(p);
     const cls = focus ? (isFocus(p) ? (on ? " focus" : " focus off-f") : " faint") : (!on ? " off" : (onF.has(p) || p === best ? "" : " dim"));
-    g += `<g class="pt${cls}" data-i="${P.indexOf(p)}" transform="translate(${x} ${y})" tabindex="0">
-      <circle r="14" fill="transparent"/><g transform="scale(${p === best ? 1.25 : 1})">${badge(p)}</g></g>`;
+    const name = `${p.label}, ${p.plan}, ${usd(p.per_task)} per task, score ${p.idx}, ${p.mins} minutes${ELIGIBLE(p.grade) ? "" : ", " + GRADE_TEXT[p.grade]}`;
+    g += `<g class="pt${cls}" data-i="${P.indexOf(p)}" data-label="${esc(p.label)}" transform="translate(${x} ${y})" tabindex="${on ? 0 : -1}" role="button" aria-label="${esc(name)}">
+      <circle r="${rr + 4}" fill="transparent"/><g transform="scale(${p === best ? 1.25 : 1})">${badge(p, ELIGIBLE(p.grade) || (focus && isFocus(p)) || p === best, rr)}</g></g>`;
   }
   // Labels: the pick first, then frontier points, skipping any that would overlap.
   const placed = P.filter(p => focus ? isFocus(p) : passes(p)).map(p => [fx(p) - 13, fy(p) - 13, 26, 26]);  // visible badges are obstacles
   const fits = (x0, y0, w, h) => !placed.some(b => x0 < b[0] + b[2] && b[0] < x0 + w && y0 < b[1] + b[3] && b[1] < y0 + h);
   // While a model is highlighted, label only its effort levels.
   const want = focus ? P.filter(isFocus).sort((a, b) => EFFORT_ORDER.indexOf(b.effort) - EFFORT_ORDER.indexOf(a.effort))
-    : [best, ...[...fr].reverse()].filter((p, i, a) => p && a.indexOf(p) === i);
+    : measuredOnly ? [...P]
+    : [best, ...[...fr].reverse().filter(p => ELIGIBLE(p.grade))].filter((p, i, a) => p && a.indexOf(p) === i);
   for (const p of want) {
     const x = fx(p), y = fy(p), w = p.label.length * 6.3 + 6, h = 14;
-    const spots = [[x - w / 2, y - R - 22, "middle", x, y - R - 11], [x + 18, y - 7, "start", x + 18, y + 4],
-                   [x - 18 - w, y - 7, "end", x - 18, y + 4], [x - w / 2, y + R + 8, "middle", x, y + R + 19]];
+    const spots = [[x - w / 2, y - rr - 22, "middle", x, y - rr - 11], [x + 18, y - 7, "start", x + 18, y + 4],
+                   [x - 18 - w, y - 7, "end", x - 18, y + 4], [x - w / 2, y + rr + 8, "middle", x, y + rr + 19]];
     const s = spots.find(([x0, y0]) => x0 > m.l && x0 + w < W - m.r && y0 > 2 && fits(x0, y0, w, h));
     if (!s) continue;
     placed.push([s[0], s[1], w, h]);
     labels += `<text class="lbl${p === best || isFocus(p) ? " win" : ""}" x="${s[3]}" y="${s[4]}" text-anchor="${s[2]}">${esc(p.label)}</text>`;
   }
   svg.innerHTML = g + labels;
+  if (pendingFocus) {
+    const el = [...svg.querySelectorAll(".pt")].find(e => e.dataset.label === pendingFocus);
+    pendingFocus = "";
+    if (el) el.focus();
+  }
   wireTips(svg, document.getElementById("tip"), p => tipHtml(p) + `<div>${!passes(p) ? failReason(p) : onF.has(p) ? (yMode === "score" ? "On the quality frontier: nothing cheaper scores higher" : "On the cost–speed frontier: nothing is both cheaper and faster") : (yMode === "score" ? "Off the frontier: something cheaper scores at least as well" : "Off the frontier: another point is both cheaper and faster")}</div>`);
 }
 
@@ -287,23 +338,81 @@ function drawRec() {
   const r = ranked(), eligible = r.filter(p => ELIGIBLE(p.grade)), best = eligible[0];
   const fr = (yMode === "score" ? [...qualityFrontier(P.filter(passes))].reverse() : frontierOf(P.filter(passes)));
   const scope = [filter ? (filter === "go" ? "OpenCode Go" : filter) : "", minScore !== null ? `score ≥ ${minScore.toFixed(1)}` : "", maxCost !== null ? `≤ ${usd(maxCost)}` : "", maxMins !== null ? `≤ ${fmtMins(maxMins)} min` : ""].filter(Boolean).join(" · ");
-  let h = `<div class="label">Cheapest measured${scope ? " · " + esc(scope) : ""}</div>`;
+  let h = `<div class="ins-label">Cheapest measured${scope ? " · " + esc(scope) : ""}</div>`;
   if (best) {
-    h += `<div class="pick" style="display:flex;align-items:center;gap:8px">${makerBadge(best.maker)}${esc(best.label)}</div><div class="plan">${esc(best.plan)} · ${gradePill(best.grade)}</div>
-      <div class="big">${usd(best.per_task)} <small>per task · score ${best.idx}</small></div>
-      <div class="meta">${best.tasks.toLocaleString()} tasks/mo at full cap · ${best.mins} min per task</div>`;
-  } else h += `<div class="pick">No measured option${minScore !== null ? " at this score" : ""}</div>`;
-  h += `<div class="block"><b>${yMode === "score" ? "Quality frontier" : "Cost–speed frontier"}</b> <span class="meta">(${yMode === "score" ? "highest score first" : "fastest first"}; score, minutes)</span><ol class="rank">${fr.map(p => `<li><span>${esc(p.label)} <span class="meta">(${p.idx}, ${p.mins} min${ELIGIBLE(p.grade) ? "" : ", " + GRADE_TEXT[p.grade]})</span></span><span>${usd(p.per_task)}</span></li>`).join("")}</ol></div>`;
-  h += `<div class="block"><b>Measured, cheapest first</b><ol class="rank">${eligible.slice(0, 8).map(p => `<li><span>${esc(p.label)} <span class="meta">(${p.idx})</span></span><span>${usd(p.per_task)}</span></li>`).join("") || "<li><span>None</span></li>"}</ol></div>`;
-  h += `<div class="block">${r.length} of ${ALL.length} points pass the filters. Set a minimum score for the work you're routing, then take the cheapest point above it.</div>`;
+    h += `<div class="ins-pick">${makerBadge(best.maker)}${esc(best.label)}</div>
+      <div class="ins-plan">${esc(best.plan)} · ${gradePill(best.grade)}</div>
+      <div class="ins-price">${usd(best.per_task)}<small>per task</small></div>
+      <div class="ins-meta">score ${best.idx} · ${best.tasks.toLocaleString()} tasks/mo · ${best.mins} min/task</div>`;
+  } else h += `<div class="ins-pick">No measured option${minScore !== null ? " at this score" : ""}</div>`;
+  h += `<div class="ins-block"><b>${yMode === "score" ? "Quality frontier" : "Cost–speed frontier"}</b> <span class="meta">(${yMode === "score" ? "highest score first" : "fastest first"})</span><ol class="rank">${fr.map(p => `<li><span>${esc(p.label)} <span class="meta">(${p.idx}, ${p.mins} min${ELIGIBLE(p.grade) ? "" : ", " + GRADE_TEXT[p.grade]})</span></span><span>${usd(p.per_task)}</span></li>`).join("")}</ol></div>`;
+  h += `<div class="ins-block"><b>Measured, cheapest first</b><ol class="rank">${eligible.slice(0, 8).map(p => `<li><span>${esc(p.label)} <span class="meta">(${p.idx})</span></span><span>${usd(p.per_task)}</span></li>`).join("") || "<li><span>None</span></li>"}</ol></div>`;
+  h += `<div class="ins-block">${r.length} of ${ALL.length} points pass the filters. Only measured points are recommended.</div>`;
   document.getElementById("rec").innerHTML = h;
+}
+
+// ---- Answer-first summaries, computed from the full dataset, not the filters ----
+function drawVerdict() {
+  const measured = ALL.filter(p => ELIGIBLE(p.grade)).sort((a, b) => a.per_task - b.per_task);
+  const best = measured[0];
+  if (!best) { document.getElementById("verdict").innerHTML = `<div class="vlabel">The answer</div><p class="vpick">No measured point is available.</p>`; return; }
+  const top = [...measured].sort((a, b) => b.idx - a.idx)[0];
+  const why = best.idx >= top.idx
+    ? "It has both the highest measured score and the lowest measured cost per task. No other measured option beats it on either axis."
+    : "It is the cheapest measured option per task, and its score is within reach of the best measured option.";
+  document.getElementById("verdict").innerHTML = `
+    <div class="vlabel">The pick for most people</div>
+    <p class="vpick">${esc(best.label)}</p>
+    <p class="vplan">${esc(best.plan)} · $${best.price}/mo · ${gradePill(best.grade)}</p>
+    <p class="vprice">${usd(best.per_task)}<small>per task</small></p>
+    <div class="vstats">
+      <div class="vstat"><b>${best.idx}</b><span>Index score</span></div>
+      <div class="vstat"><b>${best.tasks.toLocaleString()}</b><span>tasks / month</span></div>
+      <div class="vstat"><b>${best.mins} min</b><span>per task</span></div>
+    </div>
+    <p class="vwhy">${esc(why)}</p>
+    <p class="vassume">Assumes 100% of the plan's weekly cap is used.</p>
+    <a class="vcta" href="#explore">See how it compares ↓</a>`;
+}
+
+function drawGlance() {
+  const measured = ALL.filter(p => ELIGIBLE(p.grade));
+  const cheapest = [...measured].sort((a, b) => a.per_task - b.per_task)[0];
+  const fastest = [...measured].sort((a, b) => a.mins - b.mins)[0];
+  const rows = [
+    ["Work per $100", `${Math.round(100 / cheapest.per_task)} tasks`, `${cheapest.label} on ${cheapest.plan}`],
+    ["Fastest measured", `${fastest.mins} min/task`, `${fastest.label} · ${usd(fastest.per_task)}/task · score ${fastest.idx}`],
+    ["Plans compared", `${Object.keys(DATA.plans).length} plans`, "Top plan from each provider; OpenCode Go covers DeepSeek and Kimi."],
+    ["Measured coverage", `${measured.length} of ${ALL.length} points`, "The rest are inferred or modelled and never recommended."],
+  ];
+  document.getElementById("glance").innerHTML = `<div class="glance-head">At a glance</div>` + rows.map(([label, val, sub]) =>
+    `<div class="glance-row"><span class="glabel">${esc(label)}</span><span class="gval">${esc(val)}</span><span class="gsub">${esc(sub)}</span></div>`).join("")
+    + `<div class="glance-foot"><a href="#method">How these numbers are calculated →</a></div>`;
+}
+
+function drawValueBars() {
+  const byPlan = {};
+  for (const p of ALL.filter(p => ELIGIBLE(p.grade))) {
+    if (!byPlan[p.plan] || p.per_task < byPlan[p.plan].per_task) byPlan[p.plan] = p;
+  }
+  const rows = Object.values(byPlan).sort((a, b) => a.per_task - b.per_task);
+  const maxWork = Math.max(...rows.map(p => 1 / p.per_task));
+  const bars = rows.map(p => `<div class="vb-row">
+      <div class="vb-name">${esc(p.provider)}<span>${esc(p.plan)}</span></div>
+      <div class="vb-track" aria-hidden="true"><div class="vb-fill" style="width:${Math.max(6, (1 / p.per_task) / maxWork * 100).toFixed(1)}%"></div></div>
+      <div class="vb-val"><b>${Math.round(100 / p.per_task)} tasks</b><span>${usd(p.per_task)}/task<br>score ${p.idx}</span></div>
+    </div>`).join("");
+  document.getElementById("valuebars").innerHTML = `
+    <div class="vb-head"><h3>Tasks per $100 of plan</h3><span>Cheapest measured point on each plan · longer is better</span></div>
+    ${bars}
+    <p class="vb-note">Gemini, Muse, DeepSeek, Kimi and OpenCode Go have no measured point in this dataset, so they are not ranked here. Only measured points are recommended; the chart still shows every estimate.</p>`;
 }
 
 function drawTable() {
   const r = ranked(), best = r.find(p => ELIGIBLE(p.grade));
   document.getElementById("tblhead").textContent = `${filter ? (filter === "go" ? "OpenCode Go" : filter) + " points" : "All points"}${minScore !== null || maxCost !== null || maxMins !== null ? " passing the filters" : ""} (${r.length})`;
   document.getElementById("tbl").innerHTML = `<thead><tr><th>Maker</th><th>Model</th><th>Effort</th><th>Plan</th><th>Evidence</th><th class="n">Score</th><th class="n">API $/task</th><th class="n">Tasks/mo</th><th class="n">Sub $/task</th><th class="n">Min/task</th><th>Note</th></tr></thead><tbody>` +
-    r.map(p => `<tr class="${p === best ? "win" : ""}${isFocus(p) ? " hl" : ""}"><td style="white-space:nowrap">${pointBadge(p)}</td><td>${esc(p.family)}</td><td>${esc(p.effort)}</td><td>${esc(p.plan)}</td><td>${gradePill(p.grade)}</td><td class="n"><b>${p.idx}</b></td><td class="n">${usd(p.api)}</td><td class="n">${p.tasks.toLocaleString()}</td><td class="n"><b>${usd(p.per_task)}</b></td><td class="n">${p.mins}</td><td class="note">${esc(p.note)}</td></tr>`).join("") + "</tbody>";
+    r.map(p => `<tr class="${p === best ? "win" : ""}${isFocus(p) ? " hl" : ""}"><td data-label="Maker" style="white-space:nowrap">${pointBadge(p)}</td><td data-label="Model">${esc(p.family)}</td><td data-label="Effort">${esc(p.effort)}</td><td data-label="Plan">${esc(p.plan)}</td><td data-label="Evidence">${gradePill(p.grade)}</td><td data-label="Score" class="n"><b>${p.idx}</b></td><td data-label="API $/task" class="n">${usd(p.api)}</td><td data-label="Tasks/mo" class="n">${p.tasks.toLocaleString()}</td><td data-label="Sub $/task" class="n"><b>${usd(p.per_task)}</b></td><td data-label="Min/task" class="n">${p.mins}</td><td data-label="Note" class="note">${esc(p.note)}</td></tr>`).join("") + "</tbody>";
 }
 
 // Pareto frontier on cost and time: fastest first, keep a point if it is cheaper than every faster point.
@@ -346,7 +455,21 @@ document.querySelectorAll("[data-scale-for]").forEach(grp => {
   sync();
 });
 
+document.getElementById("measuredToggle").addEventListener("click", () => {
+  measuredOnly = !measuredOnly;
+  store.set("subvalue-measured", measuredOnly ? "1" : "0");
+  focus = ""; selectData(); renderAll();
+});
+function resetFilters() {
+  filter = ""; focus = ""; workLabel = ""; measuredOnly = false;
+  minScore = null; maxCost = null; maxMins = null;
+  store.set("subvalue-filter", ""); store.set("subvalue-measured", "0");
+  selectData(); renderAll();
+}
+document.getElementById("resetBtn").addEventListener("click", resetFilters);
+
 selectData();
+drawVerdict(); drawGlance(); drawValueBars();
 renderAll();
 drawPlans();
 addEventListener("resize", drawChart);

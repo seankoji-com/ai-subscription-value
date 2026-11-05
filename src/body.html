@@ -1,0 +1,225 @@
+<a class="skip" href="#explore">Skip to the comparison</a>
+<header class="masthead">
+  <div class="wrap masthead-in">
+    <a class="wordmark" href="#top" aria-label="AI subscription value home"><span class="dot" aria-hidden="true"></span><span class="wm-text">AI subscription value</span></a>
+    <nav aria-label="Sections">
+      <a href="#answer">The answer</a>
+      <a href="#explore">Compare</a>
+      <a href="#data">Data</a>
+      <a href="#method">Method</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" type="button" aria-label="Switch colour theme" title="Switch colour theme">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero wrap" aria-labelledby="title">
+    <p class="eyebrow">Independent analysis · 5 Nov 2026</p>
+    <h1 id="title">Which AI coding subscription gives the most work per dollar?</h1>
+    <p class="standfirst">Every point is one model at one effort level, priced on a provider's top subscription plan. The right pick depends on the score, cost and time you need — so this report shows the frontier, not a slogan.</p>
+    <div class="hero-grid">
+      <article class="verdict" id="verdict" aria-live="polite"></article>
+      <aside class="glance" id="glance" aria-label="At a glance"></aside>
+    </div>
+  </section>
+
+  <section class="section wrap" id="answer" aria-labelledby="answer-title">
+    <div class="section-head">
+      <div>
+        <p class="kicker">The short answer</p>
+        <h2 id="answer-title">What the measured plans actually buy</h2>
+      </div>
+      <p>Only four of the 60 plotted points have measured capacity. This is what each measured plan returns at its cheapest measured model and effort.</p>
+    </div>
+    <div class="answer-grid">
+      <div class="card valuebars" id="valuebars"></div>
+      <div class="card answer-note">
+        <div class="rule" aria-hidden="true"></div>
+        <h3>How to read this report</h3>
+        <p><strong>Measured</strong> points have capacity evidence that includes that model's traffic. They are the only points this report recommends.</p>
+        <p><strong>Inferred</strong> and <strong>modelled</strong> points are useful context, not purchase advice. Their capacity, benchmark row or effort level is estimated; the chart keeps them visible but faded.</p>
+        <p>Every figure is an estimate. A task is one benchmark task, not a unit of your own work.</p>
+        <p><a href="#method">Read the method and caveats</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section wrap" id="explore" aria-labelledby="explore-title">
+    <div class="section-head">
+      <div>
+        <p class="kicker">The comparison</p>
+        <h2 id="explore-title">Explore the trade-offs</h2>
+      </div>
+      <p>Filter to a provider or a quality floor, then read the cheapest qualifying point. The frontier marks the options nothing else beats.</p>
+    </div>
+    <div class="explorer">
+      <div class="card controls-card">
+        <div class="ctrl-group">
+          <span class="ctrl-label">Cost axis</span>
+          <div class="seg" role="group" aria-label="Cost axis scale" data-scale-for="1">
+            <button type="button" data-scale="log">Log</button>
+            <button type="button" data-scale="linear">Linear</button>
+          </div>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">Vertical axis</span>
+          <div class="seg" role="group" aria-label="Vertical axis" id="yseg">
+            <button type="button" data-y="time">Time</button>
+            <button type="button" data-y="score">Score</button>
+          </div>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">Evidence</span>
+          <button type="button" class="chip" id="measuredToggle" aria-pressed="false">Measured only</button>
+        </div>
+        <div class="filters" id="filters" role="group" aria-label="Filter by provider"></div>
+        <div class="sliders">
+          <label class="slider">Minimum score <input type="range" id="minScore" aria-describedby="minScoreOut"> <b id="minScoreOut">off</b></label>
+          <label class="slider">Maximum $/task <input type="range" id="maxCost" aria-describedby="maxCostOut"> <b id="maxCostOut">off</b></label>
+          <label class="slider">Maximum minutes <input type="range" id="maxMins" aria-describedby="maxMinsOut"> <b id="maxMinsOut">off</b></label>
+          <button type="button" class="reset-btn" id="resetBtn">Reset filters</button>
+        </div>
+      </div>
+
+      <div class="explorer-grid">
+        <div class="card chart-card">
+          <div class="chart-head">
+            <h3>Subscription cost per task</h3>
+            <span>Hover or focus a point for detail</span>
+          </div>
+          <div class="legend" id="legend"></div>
+          <div class="chartwrap">
+            <svg id="chart" role="group" aria-label="Scatter of subscription cost per task against score or minutes per task"></svg>
+            <div class="tip" id="tip" role="status"></div>
+          </div>
+          <p class="chart-note" id="chartNote">Filled badges are measured; hollow are inferred; dashed are modelled. The shaded band is the frontier among points that pass your filters. Labels mark the frontier and the cheapest measured point; click a point to highlight that model at every effort level.</p>
+        </div>
+        <aside class="card inspector" id="rec" aria-live="polite"></aside>
+      </div>
+
+      <div class="card working-card">
+        <div class="chart-head">
+          <h3>Show the working</h3>
+          <span>Tap a point to swap the example</span>
+        </div>
+        <div id="working" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section wrap" id="data" aria-labelledby="data-title">
+    <div class="section-head">
+      <div>
+        <p class="kicker">The evidence</p>
+        <h2 id="data-title">Every point, plan and caveat</h2>
+      </div>
+      <p>Open a table to audit the numbers. Each row keeps its evidence grade, source and note.</p>
+    </div>
+
+    <details class="disclosure">
+      <summary>All points <small id="tblhead">60</small></summary>
+      <div class="body tablewrap"><table id="tbl"></table></div>
+    </details>
+
+    <details class="disclosure">
+      <summary>Plans and capacity <small>what each subscription is assumed to include</small></summary>
+      <div class="body tablewrap"><table id="plans"></table></div>
+    </details>
+
+    <details class="disclosure">
+      <summary>Benchmark and scope <small>what one task means</small></summary>
+      <div class="body"><p class="note" id="benchabout"></p></div>
+    </details>
+
+    <details class="disclosure">
+      <summary>Gaps <small>where the evidence is thin</small></summary>
+      <div class="body">
+        <ul>
+          <li><b>Muse capacity is assumed.</b> Meta publishes Muse Code limits only as prompts per 5 hours (Maximum = 80× Everyday), so Muse Code Maximum ($200) is assumed to return the same API-equivalent value per dollar as Claude Ultra's measured $1,549/wk. Muse Spark 1.3 and Muse Wonder use AA's measured API cost. Muse Wonder Full has no API price (AA lists $0.00), so its tokens are priced at Fable 5.1's cost per token and it is drawn as modelled.</li>
+          <li><b>DeepSeek and Kimi come through OpenCode Go.</b> They have no top plan of their own here, so they use OpenCode Go ($10) with its published per-model allowances. Their logos show the model maker. Kimi K3.1 Pro has no AA coding-agent row, so it is modelled from Kimi K3's row.</li>
+          <li><b>Gemini has no measured capacity.</b> Google publishes no Antigravity quota. The plotted capacity is a September scenario for the Ultra 5× tier ($1,890–$5,671/month), scaled 4× for Ultra 20×. Gemini 4 Carbon scores 59 on Antigravity but isn't generally available and has no cost or time row yet.</li>
+          <li><b>Grok rests on one receipt.</b> SuperGrok Heavy capacity comes from one account's meter movement. SuperGrok ($30) has no measurement, so there's no way to tell which Grok plan is better value.</li>
+          <li><b>OpenCode harness mismatch.</b> AA tested OpenCode only with GLM-5.3, and GLM-5.3 isn't in Go's published list. Every Go point therefore uses another harness's benchmark row as a proxy.</li>
+          <li><b>Effort levels.</b> See "How the numbers are calculated" for every method. The coding-agent index (v2.0) tests Claude models and GPT-6.1 Sol at max only. Sonnet 5.5 and Sol at low–xhigh come from AA's 5 Oct snapshot, rescaled to v2.0 through each model's max row, and are graded inferred. Opus 5.5 at low–xhigh is modelled from Anthropic's own effort curve: cost from its SWE-bench Pro subset ($0.11 low, $0.21 medium, $0.29 high, $0.74 xhigh per task), score from the average of its SWE-bench Pro and Terminal-Bench 4.0 results relative to xhigh, and time from AA's Opus tokens per task at each effort. Anthropic publishes no max row, so the xhigh→max step uses AA's own Opus effort data (cost ×1.66, score ×1.047). These points are drawn with a dashed ring and never recommended. Where AA's Intelligence Index ran a model at every effort (Fable, Haiku, Astra, Luna, Grok), its effort curve is applied to the coding row; those points are modelled too.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <section class="section wrap" id="method" aria-labelledby="method-title">
+    <div class="section-head">
+      <div>
+        <p class="kicker">The method</p>
+        <h2 id="method-title">How the numbers are calculated</h2>
+      </div>
+      <p>Five numbers produce each point: a score, an API cost per task and a time per task from the benchmark, a plan capacity, and a plan price.</p>
+    </div>
+    <details class="disclosure method">
+      <summary>Read the full method <small>formulas, effort curves and caveats</small></summary>
+      <div class="body">
+        <p>Every point is one model at one effort level, on one subscription plan. Five numbers produce its position: a score, an API cost per task and a time per task from the benchmark, a plan capacity, and a plan price.</p>
+
+        <h3>1. Score</h3>
+        <p>The score is the <a href="https://artificialanalysis.ai/agents/coding-agents">Artificial Analysis Coding Agent Index v2.0</a>: the plain average of three pass rates, each run in the model's own agent harness.</p>
+        <ul>
+          <li><b>FrontierCode v1.1:</b> writing code changes to real repositories (partial credit allowed).</li>
+          <li><b>Terminal-Bench 4.0:</b> multi-step tasks in a terminal. This is the closest of the three to hands-on agent work.</li>
+          <li><b>SWE-Atlas QnA:</b> answering questions about a codebase by reading it.</li>
+        </ul>
+        <p class="eg">Example: DeepSeek V4.1 Flash scores (46.55 + 30.81 + 61.56) ÷ 3 ≈ 46.3. GPT-6.1 Terra medium scores (43.75 + 35.35 + 47.04) ÷ 3 ≈ 42.0. DeepSeek's lead comes almost entirely from SWE-Atlas QnA; Terra medium is ahead on Terminal-Bench. Each benchmark has a few dozen to about 100 tasks, so differences of a few points are within run-to-run noise.</p>
+
+        <h3>2. API cost and time per task</h3>
+        <p>AA measures what one attempt at one task costs at pay-per-token API prices (input, cached input, cache writes and output, at list price) and how long the agent runs. Both are averages over every attempt, failures included.</p>
+
+        <h3>3. Plan capacity</h3>
+        <p>Capacity is the <b>API-equivalent dollars of use a plan allows per month at 100% of its weekly cap</b>. OpenCode Go is the exception that publishes this directly, as a monthly dollar allowance per model (for example $100 for DeepSeek V4.1 Flash), and those allowances are used as-is. The other providers publish no limits in tokens or dollars. Third parties measure it by watching a plan's usage meter rise while pricing the same traffic at API rates: if $50 of API-priced work moves the weekly meter by 5%, the week is worth $1,000. Weekly figures are multiplied by 52 ÷ 12 to get a month. The plans table lists the source for every plan, and models without their own measurement use the plan-wide figure.</p>
+
+        <h3>4. Tasks per month and cost per task</h3>
+        <p class="formula">tasks per month = plan capacity ÷ API cost per task<br>subscription cost per task = plan price ÷ tasks per month</p>
+        <p class="eg">Example: Opus 5.5 max on Claude Ultra. Capacity $1,549/week × 52 ÷ 12 = $6,712/month. AA's API cost is $11.42 per task, so $6,712 ÷ $11.42 ≈ 588 tasks a month, and $200 ÷ 588 ≈ <b>$0.340 per task</b>.</p>
+        <p>Because both formulas divide by the same API cost, cost per task is really <i>plan price × API cost ÷ capacity</i>. A model that is cheap at API prices is cheap on any plan that meters it at those prices. Providers don't promise to meter that way.</p>
+
+        <h3>5. Effort levels AA doesn't publish</h3>
+        <p>AA's current coding index tests most models at one effort level. The others are derived, and the working panel shows the exact numbers for each point:</p>
+        <table class="mtable">
+        <thead><tr><th>Models</th><th>Method</th><th>Grade</th></tr></thead>
+        <tbody>
+        <tr><td>Sonnet 5.5, GPT-6.1 Sol (low–xhigh)</td><td>AA's 5 Oct snapshot tested these efforts. Each value is multiplied by (current max ÷ 5 Oct max), so the curve keeps its shape but sits on the current index.</td><td>inferred</td></tr>
+        <tr><td>Opus 5.5 (low–xhigh)</td><td>Anthropic's published effort curve: cost from its SWE-bench Pro subset ($0.11, $0.21, $0.29, $0.74 per task), score from the average of its SWE-bench Pro and Terminal-Bench results, each relative to xhigh. Anthropic publishes no max result, so AA's own Opus data bridges xhigh to max (cost × 1.66, score × 1.047). Time follows AA's Opus tokens per task.</td><td>modelled</td></tr>
+        <tr><td>Fable 5.1, Haiku 5.5, GPT-6 Astra, GPT-6 Luna, Grok 4.7</td><td>AA's Intelligence Index ran these at every effort. The coding row is multiplied by that curve: cost by the cost ratio, time by the output-token ratio, score by the score ratio.</td><td>modelled</td></tr>
+        <tr><td>DeepSeek V4.1 Flash (low–high)</td><td>Only no-reasoning ($0.425, score 45.0, 65k tokens) and max ($0.602, 59.1, 139k) are measured, plus a score at high (51.4). Cost and tokens step geometrically from no-reasoning to max; low and medium scores sit evenly between no-reasoning and high. AA's coding run used DeepSeek's default setting, treated here as max.</td><td>modelled</td></tr>
+        <tr><td>Gemini 3.8 Flash (low, medium)</td><td>BenchLeader publishes scores at low (56.1) and medium (60.6) but cost and time only at high. Scores use those measured ratios to high; cost and time use the reference effort curve: the median ratio across the eight models AA ran at every effort (Opus, Sonnet, Fable, Haiku, Sol, Terra, Astra, Luna).</td><td>modelled</td></tr>
+        <tr><td>Muse Wonder Full (low–xhigh)</td><td>Only max is benchmarked anywhere, so score, cost and time all follow the reference effort curve relative to max. Its max cost is itself priced from Fable 5.1, since Muse Wonder Full has no API price.</td><td>modelled</td></tr>
+        <tr><td>Kimi K3.1 Pro</td><td>AA has no coding-agent row for it. Kimi K3's coding row is scaled by the two models' Intelligence Index results: cost × ($3.68 ÷ $2.37), score × (61.6 ÷ 53.7), time × (35 ÷ 13 minutes).</td><td>modelled</td></tr>
+        </tbody>
+        </table>
+
+        <h3>6. Evidence grades</h3>
+        <ul>
+          <li><b>Measured</b> (filled badge): a capacity measurement that includes this model's traffic, and an AA row in the plan's own harness. Only these are recommended.</li>
+          <li><b>Inferred</b> (hollow badge): capacity measured for other models on the plan, a scaled scenario, a benchmark run in a different harness, or an effort level rescaled from the older snapshot.</li>
+          <li><b>Modelled</b> (dashed badge): no published benchmark at that effort level, or no API price.</li>
+        </ul>
+
+        <h3>Caveats</h3>
+        <ul>
+          <li>Every capacity figure is an estimate from a third party or a scenario, not a vendor contract. Wokey reports that Opus 5.5 uses about 0.6× the limit per token of other Opus models, so metering isn't always at API price.</li>
+          <li>Five-hour windows are ignored; the report assumes 100% of the weekly cap is used.</li>
+          <li>A task here is one benchmark task, not a unit of your own work. An earlier version divided cost by the score to get "cost per success". That treated the score as a retry rate and made cheap weak models look best, so the score is now kept on its own axis and as a minimum you set.</li>
+        </ul>
+        <p class="note">Sources: <a href="https://artificialanalysis.ai/agents/coding-agents">AA Coding Agent Index</a> (data via <a href="https://github.com/hraness/aicharts/blob/main/data/coding-agents.json">hraness/aicharts</a>, retrieved 27 Oct 2026) ·
+        <a href="https://wokey.ai/claude-usage-limits">wokey Claude limits</a> · <a href="https://wokey.ai/codex-usage-limits">wokey Codex limits</a> ·
+        <a href="https://aiandtractors.com/coding-agent-subscription-costs/">aiandtractors subscription costs</a> · <a href="https://opencode.ai/go">OpenCode Go</a> ·
+        <a href="https://ratelimitnow.com/limits/muse-code/">Muse Code limits</a> · <a href="https://digintoai.com/en/articles/gemini-4-argon-usage-limits">Gemini 4 Argon limits</a> ·
+        <a href="https://the-decoder.com/google-deepmind-releases-gemini-4-carbon-just-two-weeks-after-argon-with-gains-across-the-board/">The Decoder on Gemini 4 Carbon</a> · <a href="https://www.benchleader.com/effort">BenchLeader effort data</a> (CC BY 4.0, used for effort curves) · <a href="https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence">Anthropic effort guidance</a></p>
+      </div>
+    </details>
+  </section>
+
+  <footer class="wrap">
+    <p><b>AI subscription value</b> · Values each plan at 100% of its weekly cap. Benchmark: Artificial Analysis Coding Agent Index v2.0 (27 Oct 2026). Data as of 4 Nov 2026; page built __BUILT__.</p>
+    <p>Source and method: <a href="https://github.com/seankoji-com/ai-subscription-value">github.com/seankoji-com/ai-subscription-value</a>. Estimates from public data; not affiliated with any provider. Logos and trademarks belong to their owners.</p>
+  </footer>
+</main>
