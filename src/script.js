@@ -69,7 +69,7 @@ function drawFilters() {
   const focusChip = fp ? `<button type="button" class="chip" id="focusChip" aria-pressed="true" title="Stop highlighting">${makerBadge(fp.maker)}Highlighting ${esc(fp.family)} · ✕</button>` : "";
   document.getElementById("filters").innerHTML = chip("", "All", "") + makers.map(m => chip(m, m, makerBadge(m))).join("") + (hasGo ? chip("go", "OpenCode Go", goBadge) : "") + focusChip;
   const fc = document.getElementById("focusChip");
-  if (fc) fc.addEventListener("click", () => { focus = ""; selectData(); renderAll(); });
+  if (fc) fc.addEventListener("click", () => { focus = ""; workLabel = ""; selectData(); renderAll(); });
   document.querySelectorAll("#filters .chip").forEach(b => b.addEventListener("click", () => {
     filter = filter === b.dataset.f ? "" : b.dataset.f; focus = "";
     store.set("subvalue-filter", filter);
@@ -136,7 +136,7 @@ function wireTips(svg, tip, html) {
   const hide = () => tip.style.display = "none";
   svg.querySelectorAll(".pt").forEach(el => {
     el.addEventListener("mouseenter", () => show(el)); el.addEventListener("focus", () => show(el));
-    el.addEventListener("click", () => { const p = P[+el.dataset.i]; focus = focus === famKey(p) ? "" : famKey(p); hide(); selectData(); renderAll(); });
+    el.addEventListener("click", () => { const p = P[+el.dataset.i]; const same = workLabel === p.label; focus = same ? "" : famKey(p); workLabel = same ? "" : p.label; hide(); selectData(); renderAll(); });
     el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.dispatchEvent(new Event("click")); } });
     el.addEventListener("mouseleave", hide); el.addEventListener("blur", hide);
   });
@@ -214,7 +214,7 @@ function syncSlider() {
 
   document.querySelectorAll("#yseg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.y === yMode)));
 }
-const refilter = () => { syncSlider(); drawLegend(); drawChart(); drawRec(); drawTable(); };
+const refilter = () => { syncSlider(); drawLegend(); drawChart(); drawRec(); drawTable(); drawWorking(); };
 document.getElementById("minScore").addEventListener("input", e => {
   const v = +e.target.value; minScore = v <= +e.target.min ? null : v; refilter();
 });
@@ -320,7 +320,17 @@ function drawPlans() {
     Object.values(DATA.plans).map(p => `<tr><td style="white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:6px">${icon[p.provider] || ""}${esc(p.provider)}</span></td><td>${esc(p.plan)}</td><td class="n">$${p.price}</td><td class="n">${p.public ? "$" + Math.round(p.public).toLocaleString() : "per model"}</td><td class="note">${p.sources.map(x => esc(x)).join("<br>")} <a href="${esc(p.cap_url)}">Source</a></td><td class="note">${esc(p.alt)}</td></tr>`).join("") + "</tbody>";
 }
 
-function renderAll() { syncSlider(); drawLegend(); drawChart(); drawRec(); drawTable(); }
+// Working panel: the tapped point, or the cheapest measured point by default.
+let workLabel = params.get("point") || "";
+function drawWorking() {
+  const el = document.getElementById("working");
+  const p = (workLabel && P.find(q => q.label === workLabel)) || ranked().find(q => ELIGIBLE(q.grade)) || ranked()[0];
+  if (!p) { el.innerHTML = "<p class='note'>No points match the current filters.</p>"; return; }
+  el.innerHTML = `<div class="wtitle">${makerBadge(p.maker)}${esc(p.label)} · ${esc(p.plan)} ${gradePill(p.grade)}</div>
+    <table><tbody>${p.working.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</tbody></table>
+    <p class="note" style="margin-top:8px">${esc(p.note)}${workLabel ? "" : " Tap any point to see its working."}</p>`;
+}
+function renderAll() { syncSlider(); drawLegend(); drawChart(); drawRec(); drawTable(); drawWorking(); }
 
 // Controls: benchmark, scales
 document.querySelectorAll("#benchseg button").forEach(b => b.addEventListener("click", () => {
