@@ -390,23 +390,61 @@ function drawGlance() {
     + `<div class="glance-foot"><a href="#method">How these numbers are calculated →</a></div>`;
 }
 
+let barsFloor = store.get("subvalue-bars-floor") || "measured";
+let pendingFloor = null;
+const FLOORS = [["measured", "Measured"], ["40", "40+"], ["50", "50+"], ["55", "55+"], ["60", "60+"]];
+if (!FLOORS.some(([v]) => v === barsFloor)) barsFloor = "measured";
+
 function drawValueBars() {
-  const byPlan = {};
-  for (const p of ALL.filter(p => ELIGIBLE(p.grade))) {
-    if (!byPlan[p.plan] || p.per_task < byPlan[p.plan].per_task) byPlan[p.plan] = p;
-  }
-  const rows = Object.values(byPlan).sort((a, b) => a.per_task - b.per_task);
-  const maxWork = Math.max(...rows.map(p => 1 / p.per_task));
-  const bars = rows.map(p => `<div class="vb-row">
-      <div class="vb-name">${esc(p.provider)}<span>${esc(p.plan)}</span></div>
-      <div class="vb-track" aria-hidden="true"><div class="vb-fill" style="width:${Math.max(6, (1 / p.per_task) / maxWork * 100).toFixed(1)}%"></div></div>
-      <div class="vb-val"><b>${Math.round(100 / p.per_task)} tasks</b><span>${usd(p.per_task)}/task<br>score ${p.idx}</span></div>
-    </div>`).join("");
+  const planRows = Object.values(DATA.plans).map(pl => {
+    const pts = ALL.filter(p => p.plan === pl.plan);
+    const best = barsFloor === "measured"
+      ? [...pts].filter(p => ELIGIBLE(p.grade)).sort((a, b) => a.per_task - b.per_task)[0]
+      : [...pts].filter(p => p.idx >= +barsFloor).sort((a, b) => a.per_task - b.per_task)[0];
+    return { pl, best };
+  });
+  const withBest = planRows.filter(r => r.best).sort((a, b) => a.best.per_task - b.best.per_task);
+  const empty = planRows.filter(r => !r.best);
+  const rows = [...withBest, ...empty];
+  const maxWork = Math.max(...withBest.map(r => 1 / r.best.per_task), 1);
+  const bars = rows.map(({ pl, best }) => {
+    if (!best) return `<div class="vb-row empty">
+        <div class="vb-name">${esc(pl.provider)}<span class="vb-plan">${esc(pl.plan)}</span></div>
+        <div class="vb-track" aria-hidden="true"></div>
+        <div class="vb-val"><b>—</b><span>${barsFloor === "measured" ? "No measured point" : `No point ≥ ${barsFloor}`}</span></div>
+      </div>`;
+    const name = best.via_go ? `${esc(best.maker)} · via Go` : esc(pl.provider);
+    return `<div class="vb-row">
+        <div class="vb-name">${name} ${gradePill(best.grade)}<span class="vb-plan">${esc(pl.plan)} · ${esc(best.label)}</span></div>
+        <div class="vb-track" aria-hidden="true"><div class="vb-fill ${best.grade}" style="width:${Math.max(6, (1 / best.per_task) / maxWork * 100).toFixed(1)}%"></div></div>
+        <div class="vb-val"><b>${Math.round(100 / best.per_task)} tasks</b><span>${usd(best.per_task)}/task<br>score ${best.idx}</span></div>
+      </div>`;
+  }).join("");
+  const seg = FLOORS.map(([v, label]) => `<button type="button" data-floor="${v}" aria-pressed="${String(barsFloor === v)}">${label}</button>`).join("");
   document.getElementById("valuebars").innerHTML = `
-    <div class="vb-head"><h3>Tasks per $100 of plan</h3><span>Cheapest measured point on each plan · longer is better</span></div>
+    <div class="vb-head">
+      <div><h3>Tasks per $100 of plan</h3><span class="vb-sub">${barsFloor === "measured" ? "Cheapest measured point on each plan · longer is better" : `Cheapest point scoring ≥ ${barsFloor} · estimates included`}</span></div>
+      <div class="seg vb-seg" role="group" aria-label="Value floor">${seg}</div>
+    </div>
     ${bars}
-    <p class="vb-note">Gemini, Muse, DeepSeek, Kimi and OpenCode Go have no measured point in this dataset, so they are not ranked here. Only measured points are recommended; the chart still shows every estimate.</p>`;
+    <p class="vb-note">${barsFloor === "measured"
+      ? "Only measured points are recommended. Switch the floor to 40+ to see each plan's cheapest point including estimates; grades are shown beside every model."
+      : `Estimates are included at the ${barsFloor}+ floor. Bar patterns show the grade: solid measured, striped inferred, dashed modelled. Only measured points are recommendations; a plan can look cheaper because its capacity or benchmark row is estimated.`}</p>`;
+  if (pendingFloor) {
+    const el = document.querySelector(`#valuebars [data-floor="${pendingFloor}"]`);
+    pendingFloor = null;
+    if (el) el.focus();
+  }
 }
+
+document.getElementById("valuebars").addEventListener("click", e => {
+  const b = e.target.closest("[data-floor]");
+  if (!b) return;
+  barsFloor = b.dataset.floor;
+  store.set("subvalue-bars-floor", barsFloor);
+  pendingFloor = barsFloor;
+  drawValueBars();
+});
 
 function drawTable() {
   const r = ranked(), best = r.find(p => ELIGIBLE(p.grade));
@@ -464,7 +502,8 @@ function resetFilters() {
   filter = ""; focus = ""; workLabel = ""; measuredOnly = false;
   minScore = null; maxCost = null; maxMins = null;
   store.set("subvalue-filter", ""); store.set("subvalue-measured", "0");
-  selectData(); renderAll();
+  barsFloor = "measured"; store.set("subvalue-bars-floor", "measured");
+  selectData(); renderAll(); drawValueBars();
 }
 document.getElementById("resetBtn").addEventListener("click", resetFilters);
 
